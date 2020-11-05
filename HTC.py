@@ -79,7 +79,7 @@ class HTC:
         tmp.act, tmp.act_norm = act[:len(act)//2], act[len(act)//2:]
         
         # Load power spectrum
-        text_file = open(results_folder+name+delimiter+str('pdf.txt'), "r")
+        text_file = open(results_folder+name+delimiter+str('spectrum.txt'), "r")
         lines = text_file.read().split('\n\n')
         del lines[-1]
 
@@ -87,7 +87,7 @@ class HTC:
         spectr = []
 
         for i in lines:
-            spectr.append( np.array([j.split(' ') for j in i]).astype(float).astype(int) )
+            spectr.append( np.array([j.split(' ') for j in i]).astype(float) )
         tmp.spectr, tmp.spectr_norm = spectr[:len(spectr)//2], spectr[len(spectr)//2:]
         
         # Load observables
