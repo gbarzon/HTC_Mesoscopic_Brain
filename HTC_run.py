@@ -3,10 +3,10 @@ import time
 
 start = time.time()
 
-a = HTC('connectome')
+a = HTC('connectome', dT=1.)
 
 a.simulate(cluster=True)
-a.save()
+#a.save()
 
 stop = time.time()
 print('Total execution time: '+str(stop-start))

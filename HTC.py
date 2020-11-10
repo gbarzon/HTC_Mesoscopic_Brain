@@ -2,8 +2,6 @@ import numpy as np
 import networkx as nx
 from scipy.sparse.csgraph import connected_components
 
-from collections import Counter
-
 from tqdm.auto import tqdm
 from IPython.display import clear_output
 
@@ -307,7 +305,7 @@ class HTC:
                 if cluster and (not t%dt_cluster):
                     tempT = t//dt_cluster
                     for j in range(runs):
-                        S1t[j,tempT], S2t[j,tempT], tmp_counts = self.compute_clusters(W, s[j])
+                        S1t[j,tempT], S2t[j,tempT], tmp_counts = compute_clusters(W, s[j])
                         pdf[i] += tmp_counts
             # END LOOP OVER TIME
 
@@ -459,23 +457,6 @@ class HTC:
             + (S==-1)*(probs>self.r2)*-1 )           # R->I (remain R with prob 1-r2)
         
         return (newS, (newS==1).astype(int) )
-        
-    
-    def compute_clusters(self, W, sj):
-        '''
-        Compute cluster analysis
-        '''
-        
-        # mask adjacency matrix with active nodes
-        mask = (W * sj).T * sj
-        # compute connected components
-        _, labels = connected_components(mask, directed=False)
-        # count labels occurrence
-        _, counts = np.unique(labels, return_counts=True)
-        counts = -np.sort(-counts)
-        
-        # return (biggest cluster, second biggest cluster, clusters occurrence)
-        return (counts[0], counts[1], Counter(counts))
     
     
     def save(self):

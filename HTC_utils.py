@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 from scipy.signal import periodogram
+import igraph as g
+from collections import Counter
 
 def power_law(a, b, g, size):
     ''' Power-law gen for pdf(x) prop to x^{g} for a<=x<=b '''
@@ -15,6 +17,23 @@ def power_law(a, b, g, size):
 def normalize(W):
     ''' Normalize each entry in a matrix by the sum of its row'''
     return W / np.sum(W, axis=1)[:,None]
+
+
+def compute_clusters(W, sj):
+        '''
+        Compute cluster analysis
+        '''
+        
+        # mask adjacency matrix with active nodes
+        mask = (W * sj).T * sj
+        # create igraph object
+        graph = g.Graph.Adjacency(mask.tolist())
+        # compute connected components occurrence
+        counts = np.array(graph.clusters().sizes())
+        counts = -np.sort(-counts)
+        
+        # return (biggest cluster, second biggest cluster, clusters occurrence)
+        return (counts[0], counts[1], Counter(counts))
 
 
 def correlation(mat):
