@@ -4,6 +4,7 @@ from scipy.signal import periodogram
 import igraph as g
 from collections import Counter
 
+# GENERAL FUNCTION
 def power_law(a, b, g, size):
     ''' Power-law gen for pdf(x) prop to x^{g} for a<=x<=b '''
     if g == -1:
@@ -19,21 +20,55 @@ def normalize(W):
     return W / np.sum(W, axis=1)[:,None]
 
 
+# PDF/POWER SPECTRUM IO HANDLING
+def reshape_pdf(pdf):
+    ''' Reshape list of counter to sorted array '''
+    pdf = [np.array(list(i.items())).T for i in pdf]
+    pdf = [i[:, i[0].argsort()] for i in pdf]
+    
+    return pdf
+
+
+def write_lists(lst, lst_norm, fname):
+    ''' Write lists of numpy vectors to .txt file'''
+    with open(fname, 'w') as outfile:
+        for x in lst:
+            np.savetxt(outfile, x)
+            outfile.write('\n')
+        for x in lst_norm:
+            np.savetxt(outfile, x)
+            outfile.write('\n')
+
+
+def read_lists(fname):
+    ''' Read lists of numpy vectors from .txt file'''
+    text_file = open(fname, "r")
+    lines = text_file.read().split('\n\n')
+    del lines[-1]
+
+    lines = [i.split('\n') for i in lines]
+    lst = []
+
+    for i in lines:
+        lst.append( np.array([j.split(' ') for j in i]).astype(float) )
+    return spectr[:len(lst)//2], spectr[len(lst)//2:]
+
+
+# HTC SIMULATION
 def compute_clusters(W, sj):
-        '''
-        Compute cluster analysis
-        '''
+    '''
+    Compute cluster analysis
+    '''
+    # mask adjacency matrix with active nodes
+    mask = (W * sj).T * sj
+    # create igraph object
+    graph = g.Graph.Adjacency(mask.tolist())
+    # compute connected components occurrence
+    counts = np.array(graph.clusters().sizes())
+    counts = -np.sort(-counts)
         
-        # mask adjacency matrix with active nodes
-        mask = (W * sj).T * sj
-        # create igraph object
-        graph = g.Graph.Adjacency(mask.tolist())
-        # compute connected components occurrence
-        counts = np.array(graph.clusters().sizes())
-        counts = -np.sort(-counts)
-        
-        # return (biggest cluster, second biggest cluster, clusters occurrence)
-        return (counts[0], counts[1], Counter(counts))
+    # return (biggest cluster, second biggest cluster, clusters occurrence)
+    return (counts[0], counts[1], Counter(counts))
 
 
 def correlation(mat):
@@ -45,7 +80,7 @@ def correlation(mat):
     '''    
     N = mat.shape[1]
     
-    Cij = pd.DataFrame(mat).corr().to_numpy()   # compute NxN correlation matrix
+    Cij = np.corrcoef(mat, rowvar=False)        # compute NxN correlation matrix
     Cij = Cij[np.triu_indices(N, k=1)]          # get only upper-triangular values
 
     return ( np.mean(Cij), np.std(Cij) )
@@ -56,7 +91,7 @@ def entropy(data):
     Compute the ensamble entropy and its std
     '''
     p = np.mean(data, axis=1) # node activation average
-    ent = -( p*np.log2(p) + (1-p)*np.log2(1-p) ) # node entropy
+    ent = -( p*np.log2(p) + (1.-p)*np.log2(1.-p) ) # node entropy
     ent = np.mean(ent, axis=1) # run entropy
 
     # return ensemble mean/std
@@ -95,7 +130,7 @@ def interevent(data):
     '''
     steps, nodes = data.shape
     
-    # check nodes with O or 1 activation
+    # check nodes with only O or 1 activation
     # -> set dt equal to length of simulation
     not_active = np.sum(np.sum(data, axis=1)<=1.)
     
@@ -105,4 +140,4 @@ def interevent(data):
     dt = dt[ind[0][1:]-ind[0][:-1]==0]  # discard dt from different trials
     dt = np.append(dt, [steps]*not_active)
     
-    return np.mean(dt), np.std(dt)
+    return np.mean(dt), np.std(dt), Counter(dt)

@@ -75,13 +75,13 @@ class plotHTC:
         
         N = 200
         
-        Ts = [len(model.Trange)//5, np.argmax(model.sigmaA_norm), len(model.Trange)-len(model.Trange)//3]
+        Ts = [len(model.Trange)//5, np.argmax(model.S2_norm), len(model.Trange)-len(model.Trange)//3]
         
         for i in range(len(Ts)):
             # plot time series
             ax = plt.subplot(4, len(Ts), i+1)
             
-            plt.title('T='+str(round(Ts[i]/np.argmax(model.sigmaA_norm),2))+'*Tc', size=13)
+            plt.title('T='+str(round(Ts[i]/np.argmax(model.S2_norm),2))+'*Tc', size=13)
             plt.plot(range(N), model.act[Ts[i]][100:N+100], c='black', lw=0.8)
             plt.xlabel('t', size=13)
             plt.ylim( [-0.05, 0.42] )
@@ -134,8 +134,8 @@ class plotHTC:
             
             ax.set_yscale('log')
             ax.set_xscale('log')
-            plt.plot(model.pdf[Ts[i]][0], model.pdf[Ts[i]][1]/np.sum(model.pdf[Ts[i]][1]), alpha=0.7, label=r'$pdf(s)$', c='black')
-            plt.plot(model.pdf_norm[Ts[i]][0], model.pdf_norm[Ts[i]][1]/np.sum(model.pdf_norm[Ts[i]][1]),
+            plt.scatter(model.pdf[Ts[i]][0], model.pdf[Ts[i]][1]/np.sum(model.pdf[Ts[i]][1]), alpha=0.7, label=r'$pdf(s)$', c='black')
+            plt.scatter(model.pdf_norm[Ts[i]][0], model.pdf_norm[Ts[i]][1]/np.sum(model.pdf_norm[Ts[i]][1]),
                      alpha=0.7, label=r'$pdf_{norm}(s)$', c='red')
             
             plt.grid()

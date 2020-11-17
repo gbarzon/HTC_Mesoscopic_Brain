@@ -69,24 +69,19 @@ class HTC:
         # Create HTC object
         tmp = cls(network=network, W=W, N=int(N), k=int(k), p=float(p), Tmin=Tmin, Tmax=Tmax, dT=dT)
         
-        # Load activity and (if present) cluster size
-        obs = np.loadtxt(results_folder+name+delimiter+str('observables.txt'))
-        
         # Load time series
         act = np.loadtxt(results_folder+name+delimiter+str('series.txt'))
         tmp.act, tmp.act_norm = act[:len(act)//2], act[len(act)//2:]
         
         # Load power spectrum
-        text_file = open(results_folder+name+delimiter+str('spectrum.txt'), "r")
-        lines = text_file.read().split('\n\n')
-        del lines[-1]
-
-        lines = [i.split('\n') for i in lines]
-        spectr = []
-
-        for i in lines:
-            spectr.append( np.array([j.split(' ') for j in i]).astype(float) )
-        tmp.spectr, tmp.spectr_norm = spectr[:len(spectr)//2], spectr[len(spectr)//2:]
+        tmp.spectr, tmp.spectr_norm = read_lists(results_folder+name+delimiter+str('spectrum.txt'))
+        
+        # Load pdfs
+        tmp.pdf_ev, tmp.pdf_ev_norm = read_lists(results_folder+name+filename+delimiter+'pdf_ev.txt')
+        tmp.pdf_tau, tmp.pdf_tau_norm = read_lists(results_folder+name+filename+delimiter+'pdf_tau.txt')
+        
+        # Load activity and (if present) cluster size
+        obs = np.loadtxt(results_folder+name+delimiter+str('observables.txt'))
         
         # Load observables
         if len(obs)==28:
@@ -98,16 +93,8 @@ class HTC:
             tmp.S1_norm, tmp.S2_norm = obs
             
             # Unpack cluster distribution
-            text_file = open(results_folder+name+delimiter+str('pdf.txt'), "r")
-            lines = text_file.read().split('\n\n')
-            del lines[-1]
-
-            lines = [i.split('\n') for i in lines]
-            pdf = []
-
-            for i in lines:
-                pdf.append( np.array([j.split(' ') for j in i]).astype(float).astype(int) )
-            tmp.pdf, tmp.pdf_norm = pdf[:int(len(pdf)/2)], pdf[int(len(pdf)/2):]
+            tmp.pdf, tmp.pdf_norm = read_lists(results_folder+name+delimiter+str('pdf.txt'))
+            
         else:
             tmp.A, tmp.sigmaA, tmp.C, tmp.sigmaC, tmp.Ent, tmp.sigmaEnt,\
             tmp.Ev, tmp.sigmaEv, tmp.Tau, tmp.sigmaTau, tmp.Chi, tmp.sigmaChi,\
@@ -229,21 +216,23 @@ class HTC:
         if cluster:
             self.A, self.sigmaA, self.C, self.sigmaC, self.Ent, self.sigmaEnt,\
             self.Ev, self.sigmaEv, self.Tau, self.sigmaTau, self.Chi, self.sigmaChi,\
-            self.spectr, self.act, self.S1, self.S2, self.pdf = \
+            self.spectr, self.act, self.pdf_ev, self.pdf_tau, self.S1, self.S2, self.pdf = \
             self.run_model(self.W, cluster, steps, runs, N_cluster)
             
             self.A_norm, self.sigmaA_norm, self.C_norm, self.sigmaC_norm, self.Ent_norm, self.sigmaEnt_norm,\
             self.Ev_norm, self.sigmaEv_norm, self.Tau_norm, self.sigmaTau_norm, self.Chi_norm, self.sigmaChi_norm,\
-            self.spectr_norm, self.act_norm, self.S1_norm, self.S2_norm, self.pdf_norm = \
+            self.spectr_norm, self.act_norm, self.pdf_ev_norm, self.pdf_tau_norm, \
+            self.S1_norm, self.S2_norm, self.pdf_norm = \
             self.run_model(self.W_norm, cluster, steps, runs, N_cluster)
         else:
             self.A, self.sigmaA, self.C, self.sigmaC, self.Ent, self.sigmaEnt,\
             self.Ev, self.sigmaEv, self.Tau, self.sigmaTau, self.Chi, self.sigmaChi,\
-            self.spectr, self.act = self.run_model(self.W, cluster, steps, runs, N_cluster)
+            self.spectr, self.act, self.pdf_ev, self.pdf_tau = self.run_model(self.W, cluster, steps, runs, N_cluster)
             
             self.A_norm, self.sigmaA_norm, self.C_norm, self.sigmaC_norm, self.Ent_norm, self.sigmaEnt_norm,\
             self.Ev_norm, self.sigmaEv_norm, self.Tau_norm, self.sigmaTau_norm, self.Chi_norm, self.sigmaChi_norm,\
-            self.spectr_norm, self.act_norm = self.run_model(self.W_norm, cluster, steps, runs, N_cluster)
+            self.spectr_norm, self.act_norm, self.pdf_ev_norm, self.pdf_tau_norm = \
+            self.run_model(self.W_norm, cluster, steps, runs, N_cluster)
             
     
     def run_model(self, W, cluster, steps, runs, N_cluster, fract=0.):
@@ -265,6 +254,10 @@ class HTC:
         ev, sigma_ev = [np.zeros(len(Trange)) for _ in range(2)]
         tau, sigma_tau = [np.zeros(len(Trange)) for _ in range(2)]
         chi, sigma_chi = [np.zeros(len(Trange)) for _ in range(2)]
+        
+        pdf_ev = [Counter() for _ in range(len(Trange))]
+        pdf_tau = [Counter() for _ in range(len(Trange))]
+        
         spectr = []
         act = np.zeros((len(Trange), steps))
         
@@ -328,7 +321,9 @@ class HTC:
             # inter-event time
             print('Computing interevent time...')
             tmpEv = np.array(list(map(interevent, Aij)))
-            ev[i], sigma_ev[i] = np.mean(tmpEv[:,0]), np.mean(tmpEv[:,1])
+            tmpEv_mean, tmpEv_sigma, tmpEv_pdf = tmpEv[:,0], tmpEv[:,1], tmpEv[:,2]
+            ev[i], sigma_ev[i] = np.mean(tmpEv_mean), np.mean(tmpEv_sigma)
+            pdf_ev[i] = np.sum(tmpEv_pdf)
             
             # power spectrum
             print('Computing power spectrum...')
@@ -338,14 +333,19 @@ class HTC:
             if cluster:
                 S1[i] = np.mean(S1t)
                 S2[i] = np.mean(S2t)
+                
+            # clear tmp variables
+            del Aij, At, tmpEv_mean, tmpEv_sigma, tmpEv_pdf
+            if cluster:
+                del S1t, S2t
             # END COMPUTE AVERAGES 
             
             # SUSTAINED ACTIVITY
             print('\nSimulating sustained activity...')
             self.r1 = 0.                        # suppress spontaneous excitation
-            S = self.init_state(runs, 0.1) # initialize only one active node
+            S = self.init_state(10*runs, 0.1) # initialize only one active node
             # TODO: nel paper dice che tutti gli altri sono inattivi, qui possono essere anche refrattari
-            temp_tau = np.zeros((runs))
+            temp_tau = np.zeros((10*runs))
             
             # LOOP OVER TIME STEPS
             for t in tqdm(range(steps)):
@@ -364,10 +364,13 @@ class HTC:
             temp_tau += steps*(temp_tau==0)
             
             tau[i], sigma_tau[i] = np.mean(temp_tau), np.std(temp_tau)
+            pdf_tau[i] = Counter(temp_tau)
             
             # reset r1 parameter
             self.r1 = r1_old
             
+            # clear tmp variables
+            del temp_act, temp_tau
             # END SUSTAINED ACTIVITY
             
             # SUSCEPTIBILITY
@@ -402,6 +405,9 @@ class HTC:
             temp_chi += steps*(temp_chi==0)
             
             chi[i], sigma_chi[i] = np.mean(temp_chi), np.std(temp_chi)
+            
+            # clear tmp variables
+            del temp_chi, temp_act
             # END SUSCEPTIBILITY
         
         # END LOOP OVER TEMPERATUREs
@@ -409,19 +415,23 @@ class HTC:
         print(self.title + '\n')
         print('End simulating activity')
         
-        # RESHAPE CLUSTER PDF
-        pdf = [np.array(list(i.items())).T for i in pdf]
-        pdf = [i[:, i[0].argsort()] for i in pdf]
+        # Reshape pdfs
+        pdf_ev = reshape_pdf(pdf_ev)
+        pdf_tau = reshape_pdf(pdf_tau)
 
         # RETURN RESULTS
         if cluster:
+            # Reshape cluster pdf
+            pdf = reshape_pdf(pdf)
+            
             return (A, sigma_A, C, sigma_C, ent, sigma_ent, 
                     ev, sigma_ev, tau, sigma_tau, chi, sigma_chi, 
-                    spectr, act, S1/self.N, S2/self.N, pdf)
+                    spectr, act, pdf_ev, pdf_tau,
+                    S1/self.N, S2/self.N, pdf)
         else:
             return (A, sigma_A, C, sigma_C, ent, sigma_ent, 
                     ev, sigma_ev, tau, sigma_tau, chi, sigma_chi, 
-                    spectr, act)
+                    spectr, act, pdf_ev, pdf_tau)
     
     
     def init_state(self, runs, fract):
@@ -472,13 +482,10 @@ class HTC:
         np.savetxt(filename + delimiter + 'series.txt', np.vstack((self.act, self.act_norm)), fmt='%e')
         
         # Save power spectrum
-        with open(filename + delimiter + 'spectrum.txt', 'w') as outfile:
-            for x in self.spectr:
-                np.savetxt(outfile, x)
-                outfile.write('\n')
-            for x in self.spectr_norm:
-                np.savetxt(outfile, x)
-                outfile.write('\n')
+        write_lists(self.spectr, self.spectr_norm, filename + delimiter + 'spectrum.txt')
+        # Save pdfs
+        write_lists(self.pdf_ev, self.pdf_ev_norm, filename + delimiter + 'pdf_ev.txt')
+        write_lists(self.pdf_tau, self.pdf_tau_norm, filename + delimiter + 'pdf_tau.txt')
         
         if not self.cluster:
             np.savetxt(filename + delimiter + 'observables.txt',
@@ -496,11 +503,5 @@ class HTC:
                         self.A_norm, self.sigmaA_norm, self.C_norm, self.sigmaC_norm, self.Ent_norm, self.sigmaEnt_norm,
                         self.Ev_norm, self.sigmaEv_norm, self.Tau_norm, self.sigmaTau_norm, self.Chi_norm, self.sigmaChi_norm,
                         self.S1_norm, self.S2_norm), fmt='%e')
-                        
-            with open(filename + delimiter + 'pdf.txt', 'w') as outfile:
-                for x in self.pdf:
-                    np.savetxt(outfile, x)
-                    outfile.write('\n')
-                for x in self.pdf_norm:
-                    np.savetxt(outfile, x)
-                    outfile.write('\n')
+            
+            write_lists(self.pdf, self.pdf_norm, filename + delimiter + 'pdf.txt')
