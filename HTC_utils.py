@@ -1,7 +1,6 @@
 import numpy as np
-import pandas as pd
 from scipy.signal import periodogram
-import igraph as g
+import igraph as gf
 from collections import Counter
 
 # GENERAL FUNCTION

@@ -1,6 +1,5 @@
 import numpy as np
 import networkx as nx
-from scipy.sparse.csgraph import connected_components
 
 from tqdm.auto import tqdm
 from IPython.display import clear_output
@@ -14,7 +13,7 @@ class HTC:
     
     def __init__(self, network, W = None,
                  weights='power_law', N=66, 
-                 Tmin = 0.0, Tmax = 1.5, dT = 0.03,
+                 Tmin = 0.0, Tmax = 1.5, dT = 0.03, ds = 0.1,
                  **kwargs):
         '''
         Class initializer
@@ -28,6 +27,7 @@ class HTC:
         self.Tmin = Tmin
         self.Tmax = Tmax
         self.dT = dT
+        self.ds = ds
         self.dt = 0.1
         
         # Unpack parameters
@@ -156,8 +156,6 @@ class HTC:
         if not self.W is None:
             if not isinstance(self.W, (np.ndarray)):
                 raise Exception('The type of the connectivity matrix W is wrong')
-            # Create normalized matrix
-            self.W_norm = normalize(self.W)
             return
         
         # Generate adjacency matrix
@@ -190,11 +188,8 @@ class HTC:
             self.W = np.triu(self.W, 1)
             self.W = self.W + self.W.T
             self.W = self.W * top
-        
-        # Create normalized matrix
-        self.W_norm = normalize(self.W)
-        
-    
+
+
     def compute_parameters(self):
         '''
         Compute transition rates and (theorical) critical temperature
@@ -204,6 +199,7 @@ class HTC:
         self.r2 = self.r1**(1./5.)
         self.Tc = self.r2 / (1. + 2.*self.r2)
         self.Trange = np.arange(self.Tmin, self.Tmax+self.dT, self.dT) * self.Tc
+        self.stimuli = np.arange(0,1.1,self.ds)
     
     
     def simulate(self, cluster=False, steps=6000, runs=100, N_cluster=3000):
@@ -216,23 +212,24 @@ class HTC:
         if cluster:
             self.A, self.sigmaA, self.C, self.sigmaC, self.Ent, self.sigmaEnt,\
             self.Ev, self.sigmaEv, self.Tau, self.sigmaTau, self.Chi, self.sigmaChi,\
-            self.spectr, self.act, self.pdf_ev, self.pdf_tau, self.S1, self.S2, self.pdf = \
+            self.spectr, self.act, self.pdf_ev, self.pdf_tau, self.Ext, \
+            self.S1, self.S2, self.pdf = \
             self.run_model(self.W, cluster, steps, runs, N_cluster)
             
             self.A_norm, self.sigmaA_norm, self.C_norm, self.sigmaC_norm, self.Ent_norm, self.sigmaEnt_norm,\
             self.Ev_norm, self.sigmaEv_norm, self.Tau_norm, self.sigmaTau_norm, self.Chi_norm, self.sigmaChi_norm,\
-            self.spectr_norm, self.act_norm, self.pdf_ev_norm, self.pdf_tau_norm, \
+            self.spectr_norm, self.act_norm, self.pdf_ev_norm, self.pdf_tau_norm, self.Extnorm, \
             self.S1_norm, self.S2_norm, self.pdf_norm = \
-            self.run_model(self.W_norm, cluster, steps, runs, N_cluster)
+            self.run_model(normalize(self.W), cluster, steps, runs, N_cluster)
         else:
             self.A, self.sigmaA, self.C, self.sigmaC, self.Ent, self.sigmaEnt,\
             self.Ev, self.sigmaEv, self.Tau, self.sigmaTau, self.Chi, self.sigmaChi,\
-            self.spectr, self.act, self.pdf_ev, self.pdf_tau = self.run_model(self.W, cluster, steps, runs, N_cluster)
+            self.spectr, self.act, self.pdf_ev, self.pdf_tau,  self.Ext = self.run_model(self.W, cluster, steps, runs, N_cluster)
             
             self.A_norm, self.sigmaA_norm, self.C_norm, self.sigmaC_norm, self.Ent_norm, self.sigmaEnt_norm,\
             self.Ev_norm, self.sigmaEv_norm, self.Tau_norm, self.sigmaTau_norm, self.Chi_norm, self.sigmaChi_norm,\
-            self.spectr_norm, self.act_norm, self.pdf_ev_norm, self.pdf_tau_norm = \
-            self.run_model(self.W_norm, cluster, steps, runs, N_cluster)
+            self.spectr_norm, self.act_norm, self.pdf_ev_norm, self.pdf_tau_norm, self.Extnorm = \
+            self.run_model(normalize(self.W), cluster, steps, runs, N_cluster)
             
     
     def run_model(self, W, cluster, steps, runs, N_cluster, fract=0.):
@@ -241,7 +238,6 @@ class HTC:
         '''
         
         dt_cluster = int(steps/N_cluster)
-        r1_old = self.r1
         
         # treshold interval
         W_mean = np.mean(np.sum(W, axis=1))
@@ -257,6 +253,8 @@ class HTC:
         
         pdf_ev = [Counter() for _ in range(len(Trange))]
         pdf_tau = [Counter() for _ in range(len(Trange))]
+        
+        Ext = np.zeros((len(Trange),len(self.stimuli)))
         
         spectr = []
         act = np.zeros((len(Trange), steps))
@@ -291,7 +289,7 @@ class HTC:
             # LOOP OVER TIME STEPS
             for t in tqdm(range(steps)):
                 # UPDATE STATE VECTOR
-                S, s = self.update_state(S, W, T)
+                S, s = self.update_state(S, W, T, self.r1)
                 Aij[:,t,:] = s
 
                 # COMPUTE CLUSTERS
@@ -301,7 +299,10 @@ class HTC:
                         S1t[j,tempT], S2t[j,tempT], tmp_counts = compute_clusters(W, s[j])
                         pdf[i] += tmp_counts
             # END LOOP OVER TIME
-
+            
+            # clear tmp variables
+            del S, s
+            
             # COMPUTE AVERAGES
             # activity
             print('Computing activity...')
@@ -338,11 +339,10 @@ class HTC:
             del Aij, At, tmpEv_mean, tmpEv_sigma, tmpEv_pdf
             if cluster:
                 del S1t, S2t
-            # END COMPUTE AVERAGES 
+            # END COMPUTE AVERAGES
             
             # SUSTAINED ACTIVITY
             print('\nSimulating sustained activity...')
-            self.r1 = 0.                        # suppress spontaneous excitation
             S = self.init_state(10*runs, 0.1) # initialize only one active node
             # TODO: nel paper dice che tutti gli altri sono inattivi, qui possono essere anche refrattari
             temp_tau = np.zeros((10*runs))
@@ -350,7 +350,7 @@ class HTC:
             # LOOP OVER TIME STEPS
             for t in tqdm(range(steps)):
                 # update state vector
-                S, s = self.update_state(S, W, T)
+                S, s = self.update_state(S, W, T, r1=0.) # suppress spontaneous excitation
                 temp_act = np.mean(s, axis=1)
                 
                 # if activity is suppressed, save timestep
@@ -365,9 +365,6 @@ class HTC:
             
             tau[i], sigma_tau[i] = np.mean(temp_tau), np.std(temp_tau)
             pdf_tau[i] = Counter(temp_tau)
-            
-            # reset r1 parameter
-            self.r1 = r1_old
             
             # clear tmp variables
             del temp_act, temp_tau
@@ -384,7 +381,7 @@ class HTC:
             # LOOP OVER TIME STEPS
             for t in tqdm(range(steps)):
                 # update state vector
-                S, s = self.update_state(S, W, T)
+                S, s = self.update_state(S, W, T, self.r1)
                 
                 if t<window:
                     temp_act[:,t] = np.mean(s, axis=1)
@@ -409,6 +406,30 @@ class HTC:
             # clear tmp variables
             del temp_chi, temp_act
             # END SUSCEPTIBILITY
+            
+            # DYNAMICAL RANGE
+            print('\nSimulating dynamical range...')
+            # Loop over rates
+            for j,r in enumerate(self.stimuli):
+                print(str(j+1)+'/'+str(len(self.stimuli))+':')
+                
+                S = self.init_state(runs, 0.1)
+                At = np.zeros((runs, steps//10))
+                
+                # Loop over time steps
+                for t in tqdm(range(steps//10)):
+                    # update state vector
+                    S, s = self.update_state(S, W, T, r1=r)
+                    # compute average activity
+                    At[:,t] = np.mean(s, axis=1)
+                # end loop over time steps
+                Ext[i,j] = np.mean(At)
+            # End loop over rates
+            
+            # clear tmp variables
+            del At, S, s
+            
+            # END DYNAMICAL RANGE
         
         # END LOOP OVER TEMPERATUREs
         clear_output(wait=True)
@@ -426,12 +447,12 @@ class HTC:
             
             return (A, sigma_A, C, sigma_C, ent, sigma_ent, 
                     ev, sigma_ev, tau, sigma_tau, chi, sigma_chi, 
-                    spectr, act, pdf_ev, pdf_tau,
+                    spectr, act, pdf_ev, pdf_tau, Ext,
                     S1/self.N, S2/self.N, pdf)
         else:
             return (A, sigma_A, C, sigma_C, ent, sigma_ent, 
                     ev, sigma_ev, tau, sigma_tau, chi, sigma_chi, 
-                    spectr, act, pdf_ev, pdf_tau)
+                    spectr, act, pdf_ev, pdf_tau, Ext)
     
     
     def init_state(self, runs, fract):
@@ -452,14 +473,15 @@ class HTC:
         return np.array([np.random.choice(ss, len(ss), replace=False) for _ in range(runs)])
     
     
-    def update_state(self, S, W, T):
+    def update_state(self, S, W, T, r1):
         '''
         Update state of the system according to HTC model
         '''
         
+        
         probs = np.random.rand(S.shape[0], S.shape[1])   # generate probabilities
         s = (S==1).astype(int)                           # get active nodes
-        pA = self.r1 + (1.-self.r1) * ( (W@s.T)>T )      # prob. to become active
+        pA = r1 + (1.-r1) * ( (W@s.T)>T )      # prob. to become active
 
         # update state vector
         newS = ( (S==0)*(probs<pA.T)                 # I->A
