@@ -50,7 +50,7 @@ def read_lists(fname):
 
     for i in lines:
         lst.append( np.array([j.split(' ') for j in i]).astype(float) )
-    return spectr[:len(lst)//2], spectr[len(lst)//2:]
+    return lst[:len(lst)//2], lst[len(lst)//2:]
 
 
 # HTC SIMULATION
