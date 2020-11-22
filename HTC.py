@@ -206,7 +206,7 @@ class HTC:
         self.r2 = self.r1**(1./5.)
         self.Tc = self.r2 / (1. + 2.*self.r2)
         self.Trange = np.arange(self.Tmin, self.Tmax+self.dT, self.dT) * self.Tc
-        self.stimuli = np.arange(0,1.1,self.ds)
+        self.stimuli = np.arange(0,1.0+self.ds,self.ds)
     
     
     def simulate(self, cluster=False, steps=6000, runs=100, N_cluster=3000):
@@ -417,8 +417,7 @@ class HTC:
             # DYNAMICAL RANGE
             print('\nSimulating dynamical range...')
             # Loop over rates
-            for j,r in enumerate(self.stimuli):
-                print(str(j+1)+'/'+str(len(self.stimuli)))
+            for j in tqdm(range(len(self.stimuli))):
                 
                 S = self.init_state(runs, 0.1)
                 At = np.zeros((runs, steps//10))
@@ -426,7 +425,7 @@ class HTC:
                 # Loop over time steps
                 for t in range(steps//10):
                     # update state vector
-                    S, s = self.update_state(S, W, T, r1=r)
+                    S, s = self.update_state(S, W, T, r1=self.stimuli[j])
                     # compute average activity
                     At[:,t] = np.mean(s, axis=1)
                 # end loop over time steps
