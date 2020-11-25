@@ -249,6 +249,8 @@ class HTC:
             self.Ev_norm, self.sigmaEv_norm, self.Tau_norm, self.sigmaTau_norm, self.Chi_norm, self.sigmaChi_norm,\
             self.spectr_norm, self.act_norm, self.pdf_ev_norm, self.pdf_tau_norm, self.Exc_norm = \
             self.run_model(normalize(self.W), cluster, steps, runs, N_cluster)
+        
+        print('End simulation for '+str(self.name))
             
     
     def run_model(self, W, cluster, steps, runs, N_cluster, fract=0.1):

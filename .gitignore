@@ -2,7 +2,7 @@
 ###################
 *.ipynb_checkpoints
 __pycache__
-
+dask-worker-space
 
 # Compiled source #
 ###################
