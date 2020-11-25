@@ -54,6 +54,41 @@ def read_lists(fname):
 
 
 # HTC SIMULATION
+def init_state(N, runs, fract):
+    '''
+    Initialize the state of the system
+    fract: fraction of initial acrive neurons
+    '''
+    from math import ceil
+        
+    n_act = ceil(fract * N)     # number of initial active neurons
+        
+    # create vector with n_act 1's, the rest half 0's and half -1's
+    ss = np.zeros(N)
+    ss[:n_act] = 1.
+    ss[-(N-n_act)//2:] = -1.
+        
+    # return shuffled array
+    return np.array([np.random.choice(ss, len(ss), replace=False) for _ in range(runs)])
+    
+    
+def update_state(S, W, T, r1, r2):
+    '''
+    Update state of the system according to HTC model
+    '''
+        
+    probs = np.random.rand(S.shape[0], S.shape[1])   # generate probabilities
+    s = (S==1).astype(int)                           # get active nodes
+    pA = r1 + (1.-r1) * ( (W@s.T)>T )                # prob. to become active
+
+    # update state vector
+    newS = ( (S==0)*(probs<pA.T)                     # I->A
+         + (S==1)*-1                                 # A->R
+         + (S==-1)*(probs>r2)*-1 )                   # R->I (remain R with prob 1-r2)
+        
+    return (newS, (newS==1).astype(int) )
+
+
 def compute_clusters(W, sj):
     '''
     Compute cluster analysis
@@ -61,7 +96,7 @@ def compute_clusters(W, sj):
     # mask adjacency matrix with active nodes
     mask = (W * sj).T * sj
     # create igraph object
-    graph = g.Graph.Adjacency(mask.tolist())
+    graph = gf.Graph.Adjacency(mask.tolist())
     # compute connected components occurrence
     counts = np.array(graph.clusters().sizes())
     counts = -np.sort(-counts)
@@ -70,6 +105,24 @@ def compute_clusters(W, sj):
     return (counts[0], counts[1], Counter(counts))
 
 
+def stimulated_activity(W, runs, steps, r1, r2):
+    '''
+    Simulate activity with external stimulus
+    '''
+    N = W.shape[0]
+    S = init_state(N, runs, fract)
+    At = np.zeros((runs, steps))
+                
+    # Loop over time steps
+    for t in range(steps):
+        # update state vector
+        S, s = update_state(S, W, T, r1=r1, r2=r2)
+        # compute average activity
+        At[:,t] = np.mean(s, axis=1)
+    # end loop over time steps
+    return np.mean(At)
+    
+    
 def correlation(mat):
     '''
     Return the (mean and std) correlation btw N time series.

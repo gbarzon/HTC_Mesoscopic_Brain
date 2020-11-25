@@ -73,6 +73,7 @@ class plotHTC:
 
         plt.figure(figsize=(16,16))
         
+        # length of sketch of time series to be plotted
         N = 200
         
         Ts = [len(model.Trange)//5, np.argmax(model.S2_norm), len(model.Trange)-len(model.Trange)//3]

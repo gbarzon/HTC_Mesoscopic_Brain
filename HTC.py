@@ -6,19 +6,21 @@ from IPython.display import clear_output
 
 from HTC_utils import *
 
-results_folder = 'results/'
+#results_folder = 'results/'
 delimiter = '_'
 
 class HTC:
     
     def __init__(self, network, W = None,
-                 weights='power_law', N=66, 
-                 Tmin = 0.0, Tmax = 1.5, dT = 0.03, ds = 0.01,
+                 weights='power_law', N=66,
+                 Tmin = 0.0, Tmax = 1.5, dT = 0.03, ds = 0.01, Id = 0,
                  **kwargs):
         '''
         Class initializer
         '''
+        self.verbose = False
         
+        self.Id = Id
         self.W = W
         self.network = network
         self.N = N
@@ -44,11 +46,12 @@ class HTC:
         
      
     @classmethod
-    def loadFromName(cls, name):
+    def loadFromName(cls, filename):
+        name = filename.split('/')[-1]
         network = name.split(delimiter)[0]
         
         # Load weights matrix
-        W = np.loadtxt(results_folder+name+delimiter+'matrix.txt')
+        W = np.loadtxt(filename+delimiter+'matrix.txt')
         
         # Unpack parameters from name
         N, k, p = [0, 0, 0]
@@ -64,30 +67,30 @@ class HTC:
         elif network == 'powerlaw':
             network, N, k, p = name.split(delimiter)[:4]
         
-        Tmin, Tmax, dT, ds = map(float, name.split(delimiter)[-4:])
+        Tmin, Tmax, dT, ds, Id = map(float, name.split(delimiter)[-5:])
         
         # Create HTC object
-        tmp = cls(network=network, W=W, N=int(N), k=int(k), p=float(p), Tmin=Tmin, Tmax=Tmax, dT=dT, ds=ds)
+        tmp = cls(network=network, W=W, N=int(N), k=int(k), p=float(p), Tmin=Tmin, Tmax=Tmax, dT=dT, ds=ds, Id=Id)
         
         # Load time series
-        act = np.loadtxt(results_folder+name+delimiter+str('series.txt'))
+        act = np.loadtxt(filename+delimiter+str('series.txt'))
         tmp.act, tmp.act_norm = act[:len(act)//2], act[len(act)//2:]
         del act
         
         # Load power spectrum
-        tmp.spectr, tmp.spectr_norm = read_lists(results_folder+name+delimiter+str('spectrum.txt'))
+        tmp.spectr, tmp.spectr_norm = read_lists(filename+delimiter+str('spectrum.txt'))
         
         # Load pdfs
-        tmp.pdf_ev, tmp.pdf_ev_norm = read_lists(results_folder+name+delimiter+'pdf_ev.txt')
-        tmp.pdf_tau, tmp.pdf_tau_norm = read_lists(results_folder+name+delimiter+'pdf_tau.txt')
+        tmp.pdf_ev, tmp.pdf_ev_norm = read_lists(filename+delimiter+'pdf_ev.txt')
+        tmp.pdf_tau, tmp.pdf_tau_norm = read_lists(filename+delimiter+'pdf_tau.txt')
         
         # Load stimulated activity
-        exc = np.loadtxt(results_folder+name+delimiter+str('stimulated.txt'))
+        exc = np.loadtxt(filename+delimiter+str('stimulated.txt'))
         tmp.Exc, tmp.Exc_norm = exc[:len(exc)//2], exc[len(exc)//2:]
         del exc
         
         # Load activity and (if present) cluster size
-        obs = np.loadtxt(results_folder+name+delimiter+str('observables.txt'))
+        obs = np.loadtxt(filename+delimiter+str('observables.txt'))
         
         # Load observables
         if len(obs)==28:
@@ -99,7 +102,7 @@ class HTC:
             tmp.S1_norm, tmp.S2_norm = obs
             
             # Unpack cluster distribution
-            tmp.pdf, tmp.pdf_norm = read_lists(results_folder+name+delimiter+str('pdf.txt'))
+            tmp.pdf, tmp.pdf_norm = read_lists(filename+delimiter+str('pdf.txt'))
             
         else:
             tmp.A, tmp.sigmaA, tmp.C, tmp.sigmaC, tmp.Ent, tmp.sigmaEnt,\
@@ -151,7 +154,8 @@ class HTC:
             
         # add Tmin, Tmax, dT to the name
         self.name += delimiter + str(self.Tmin) + delimiter + str(self.Tmax) \
-                    + delimiter + str(self.dT) + delimiter + str(self.ds)
+                    + delimiter + str(self.dT) + delimiter + str(self.ds) \
+                    + delimiter + str(self.Id)
         
     
     def generate_network(self):
@@ -195,7 +199,12 @@ class HTC:
             self.W = np.triu(self.W, 1)
             self.W = self.W + self.W.T
             self.W = self.W * top
-
+            
+        # Check if connected, otherwise try to generate again
+        if not nx.is_connected(nx.from_numpy_matrix(self.W)):
+            self.W = None
+            print('WARNING: the network is not connected. Generate again.')
+            self.generate_network()
 
     def compute_parameters(self):
         '''
@@ -208,6 +217,9 @@ class HTC:
         self.Trange = np.arange(self.Tmin, self.Tmax+self.dT, self.dT) * self.Tc
         self.stimuli = np.arange(0,1.0+self.ds,self.ds)
     
+    def parallel_simulation(self, cluster=False, steps=6000, runs=1, N_cluster=3000):
+        self.simulate(cluster=cluster, steps=steps, runs=runs, N_cluster=N_cluster)
+        return self
     
     def simulate(self, cluster=False, steps=6000, runs=100, N_cluster=3000):
         '''
@@ -239,7 +251,7 @@ class HTC:
             self.run_model(normalize(self.W), cluster, steps, runs, N_cluster)
             
     
-    def run_model(self, W, cluster, steps, runs, N_cluster, fract=0.):
+    def run_model(self, W, cluster, steps, runs, N_cluster, fract=0.1):
         '''
         HTC model
         '''
@@ -270,21 +282,23 @@ class HTC:
             S1, S2 = [np.zeros(len(Trange)) for _ in range(2)]
             pdf = [Counter() for _ in range(len(Trange))]
 
-        print(self.title)
-        if W_mean==1.:
-            print('START SIMULATION WITH NORMALIZED MATRIX...')
-        else:
-            print('START SIMULATION WITH ORIGINAL MATRIX...')
+        if self.verbose:
+            print(self.title)
+            if W_mean==1.:
+                print('START SIMULATION WITH NORMALIZED MATRIX...')
+            else:
+                print('START SIMULATION WITH ORIGINAL MATRIX...')
             
         # LOOP OVER TEMPERATUREs
         for i,T in enumerate(Trange):
-            clear_output(wait=True)
-            #print(self.title + '\n')
-            print('\n'+str(i+1) + '/'+ str(len(Trange)) + ' - T = ' +  str(round(T/self.Tc/W_mean, 2)) + ' * Tc' )
-            print('Simulating activity...')
+            if self.verbose:
+                clear_output(wait=True)
+                #print(self.title + '\n')
+                print('\n'+str(i+1) + '/'+ str(len(Trange)) + ' - T = ' +  str(round(T/self.Tc/W_mean, 2)) + ' * Tc' )
+                print('Simulating activity...')
 
             # MODEL INITIALIZATION
-            S = self.init_state(runs, fract)
+            S = init_state(self.N, runs, fract)
 
             # create empty array to store activity and cluster size over time
             Aij = np.zeros((runs, steps, self.N))
@@ -294,9 +308,9 @@ class HTC:
                 S2t = np.zeros((runs, N_cluster))
 
             # LOOP OVER TIME STEPS
-            for t in tqdm(range(steps)):
+            for t in ( tqdm(range(steps)) if self.verbose else range(steps)):
                 # UPDATE STATE VECTOR
-                S, s = self.update_state(S, W, T, self.r1)
+                S, s = update_state(S, W, T, self.r1, self.r2)
                 Aij[:,t,:] = s
 
                 # COMPUTE CLUSTERS
@@ -312,29 +326,29 @@ class HTC:
             
             # COMPUTE AVERAGES
             # activity
-            print('Computing activity...')
+            if self.verbose: print('Computing activity...')
             At = np.mean(Aij, axis=2)    # node average <A(t)>
             A[i], sigma_A[i] = np.mean(At), np.mean( np.std(At, axis=1) )
             act[i] = At[0]
             
             # correlation
-            print('Computing correlation...')
+            if self.verbose: print('Computing correlation...')
             tmpCij = np.array(list(map(correlation, Aij)))
             C[i], sigma_C[i] = np.mean(tmpCij[:,0]), np.mean(tmpCij[:,1])
             
             # entropy
-            print('Computing entropy...')
+            if self.verbose: print('Computing entropy...')
             ent[i], sigma_ent[i] = entropy(Aij)
             
             # inter-event time
-            print('Computing interevent time...')
+            if self.verbose: print('Computing interevent time...')
             tmpEv = np.array(list(map(interevent, Aij)))
             tmpEv_mean, tmpEv_sigma, tmpEv_pdf = tmpEv[:,0], tmpEv[:,1], tmpEv[:,2]
             ev[i], sigma_ev[i] = np.mean(tmpEv_mean), np.mean(tmpEv_sigma)
             pdf_ev[i] = np.sum(tmpEv_pdf)
             
             # power spectrum
-            print('Computing power spectrum...')
+            if self.verbose: print('Computing power spectrum...')
             spectr.append(avg_pow_spec(At))
             
             # cluster
@@ -349,15 +363,15 @@ class HTC:
             # END COMPUTE AVERAGES
             
             # SUSTAINED ACTIVITY
-            print('\nSimulating sustained activity...')
-            S = self.init_state(10*runs, 0.1) # initialize only one active node
+            if self.verbose: print('\nSimulating sustained activity...')
+            S = init_state(self.N, 10*runs, 0.1) # initialize only one active node
             # TODO: nel paper dice che tutti gli altri sono inattivi, qui possono essere anche refrattari
             temp_tau = np.zeros((10*runs))
             
             # LOOP OVER TIME STEPS
-            for t in tqdm(range(steps)):
+            for t in ( tqdm(range(steps)) if self.verbose else range(steps)):
                 # update state vector
-                S, s = self.update_state(S, W, T, r1=0.) # suppress spontaneous excitation
+                S, s = update_state(S, W, T, r1=0., r2=self.r2) # suppress spontaneous excitation
                 temp_act = np.mean(s, axis=1)
                 
                 # if activity is suppressed, save timestep
@@ -378,17 +392,17 @@ class HTC:
             # END SUSTAINED ACTIVITY
             
             # SUSCEPTIBILITY
-            print('\nSimulating susceptibility...')
+            if self.verbose: print('\nSimulating susceptibility...')
             window = 20
             thresh = 0.03
             temp_chi = np.zeros(runs)
             temp_act = np.zeros((runs, window))
-            S = self.init_state(runs, 0.8) # initialize 80% active nodes
+            S = init_state(self.N, runs, 0.8) # initialize 80% active nodes
             
             # LOOP OVER TIME STEPS
-            for t in tqdm(range(steps)):
+            for t in ( tqdm(range(steps)) if self.verbose else range(steps)):
                 # update state vector
-                S, s = self.update_state(S, W, T, self.r1)
+                S, s = update_state(S, W, T, self.r1, self.r2)
                 
                 if t<window:
                     temp_act[:,t] = np.mean(s, axis=1)
@@ -415,17 +429,17 @@ class HTC:
             # END SUSCEPTIBILITY
             
             # DYNAMICAL RANGE
-            print('\nSimulating dynamical range...')
+            if self.verbose: print('\nSimulating dynamical range...')
+            
             # Loop over rates
-            for j in tqdm(range(len(self.stimuli))):
-                
-                S = self.init_state(runs, 0.1)
+            for j in ( tqdm(range(len(self.stimuli))) if self.verbose else range(len(self.stimuli))):                
+                S = init_state(self.N, runs, fract)
                 At = np.zeros((runs, steps//10))
                 
                 # Loop over time steps
                 for t in range(steps//10):
                     # update state vector
-                    S, s = self.update_state(S, W, T, r1=self.stimuli[j])
+                    S, s = update_state(S, W, T, r1=self.stimuli[j], r2=self.r2)
                     # compute average activity
                     At[:,t] = np.mean(s, axis=1)
                 # end loop over time steps
@@ -434,13 +448,13 @@ class HTC:
             
             # clear tmp variables
             del At, S, s
-            
             # END DYNAMICAL RANGE
         
         # END LOOP OVER TEMPERATUREs
-        clear_output(wait=True)
-        print(self.title + '\n')
-        print('End simulating activity')
+        if self.verbose:
+            clear_output(wait=True)
+            print(self.title + '\n')
+            print('End simulating activity')
         
         # Reshape pdfs
         pdf_ev = reshape_pdf(pdf_ev)
@@ -459,48 +473,12 @@ class HTC:
             return (A, sigma_A, C, sigma_C, ent, sigma_ent, 
                     ev, sigma_ev, tau, sigma_tau, chi, sigma_chi, 
                     spectr, act, pdf_ev, pdf_tau, Exc)
-    
-    
-    def init_state(self, runs, fract):
-        '''
-        Initialize the state of the system
-        fract: fraction of initial acrive neurons
-        '''
-        from math import ceil
-        
-        n_act = ceil(fract * self.N)     # number of initial active neurons
-        
-        # create vector with n_act 1's, the rest half 0's and half -1's
-        ss = np.zeros(self.N)
-        ss[:n_act] = 1.
-        ss[-(self.N-n_act)//2:] = -1.
-        
-        # return shuffled array
-        return np.array([np.random.choice(ss, len(ss), replace=False) for _ in range(runs)])
-    
-    
-    def update_state(self, S, W, T, r1):
-        '''
-        Update state of the system according to HTC model
-        '''
         
         
-        probs = np.random.rand(S.shape[0], S.shape[1])   # generate probabilities
-        s = (S==1).astype(int)                           # get active nodes
-        pA = r1 + (1.-r1) * ( (W@s.T)>T )      # prob. to become active
-
-        # update state vector
-        newS = ( (S==0)*(probs<pA.T)                 # I->A
-            + (S==1)*-1                              # A->R
-            + (S==-1)*(probs>self.r2)*-1 )           # R->I (remain R with prob 1-r2)
-        
-        return (newS, (newS==1).astype(int) )
-    
-    
-    def save(self):
+    def save(self, results_folder):
         '''
         Save output
-        '''
+        '''        
         
         filename = results_folder+self.name
         
