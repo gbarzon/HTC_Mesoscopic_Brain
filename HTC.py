@@ -39,7 +39,7 @@ class HTC:
         self.generate_network()
         self.compute_parameters()
         
-        print('CREATED ' + self.title + ' ...\n')
+        print('CREATED ' + self.title + ', id=' + str(self.Id) + ' ...\n')
         # Check if the network is connected
         if not nx.is_connected(nx.from_numpy_matrix(self.W)):
             print('WARNING: the network is not connected')
