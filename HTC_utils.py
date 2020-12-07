@@ -96,7 +96,7 @@ def compute_clusters(W, sj):
     # mask adjacency matrix with active nodes
     mask = (W * sj).T * sj
     # create igraph object
-    graph = gf.Graph.Adjacency(mask.tolist())
+    graph = gf.Graph.Adjacency( (mask > 0).tolist())
     # compute connected components occurrence
     counts = np.array(graph.clusters().sizes())
     counts = -np.sort(-counts)
@@ -144,6 +144,8 @@ def entropy(data):
     '''
     p = np.mean(data, axis=1) # node activation average
     ent = -( p*np.log2(p) + (1.-p)*np.log2(1.-p) ) # node entropy
+    ent[np.isnan(ent)] = 0.
+    ent[np.logical_not(np.isfinite(ent))] = 0.
     ent = np.mean(ent, axis=1) # run entropy
 
     # return ensemble mean/std

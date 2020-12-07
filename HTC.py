@@ -13,7 +13,8 @@ class HTC:
     
     def __init__(self, network, W = None,
                  weights='power_law', N=66,
-                 Tmin = 0.0, Tmax = 1.5, dT = 0.03, ds = 0.01, Id = 0,
+                 Tmin = 0.0, Tmax = 1.5, dT = 0.03, W_mean=None,
+                 ds = 0.01, Id = 0,
                  **kwargs):
         '''
         Class initializer
@@ -29,6 +30,7 @@ class HTC:
         self.Tmin = Tmin
         self.Tmax = Tmax
         self.dT = dT
+        self.W_mean = W_mean
         self.ds = ds
         self.dt = 0.1
         
@@ -67,10 +69,10 @@ class HTC:
         elif network == 'powerlaw':
             network, N, k, p = name.split(delimiter)[:4]
         
-        Tmin, Tmax, dT, ds, Id = map(float, name.split(delimiter)[-5:])
+        Tmin, Tmax, dT, ds, Id, W_mean = map(float, name.split(delimiter)[-5:])
         
         # Create HTC object
-        tmp = cls(network=network, W=W, N=int(N), k=int(k), p=float(p), Tmin=Tmin, Tmax=Tmax, dT=dT, ds=ds, Id=Id)
+        tmp = cls(network=network, W=W, N=int(N), k=int(k), p=float(p), Tmin=Tmin, Tmax=Tmax, dT=dT, ds=ds, Id=Id, W_mean=W_mean)
         
         # Load time series
         act = np.loadtxt(filename+delimiter+str('series.txt'))
@@ -155,7 +157,7 @@ class HTC:
         # add Tmin, Tmax, dT to the name
         self.name += delimiter + str(self.Tmin) + delimiter + str(self.Tmax) \
                     + delimiter + str(self.dT) + delimiter + str(self.ds) \
-                    + delimiter + str(self.Id)
+                    + delimiter + str(self.Id) + delimiter + str(self.W_mean)
         
     
     def generate_network(self):
@@ -216,15 +218,15 @@ class HTC:
         self.Tc = self.r2 / (1. + 2.*self.r2)
         self.Trange = np.arange(self.Tmin, self.Tmax+self.dT, self.dT) * self.Tc
         self.stimuli = np.arange(0,1.0+self.ds,self.ds)
+        if self.W_mean == None:
+            self.W_mean = round( np.mean(np.sum(self.W, axis=1)), 2 )
     
-    def parallel_simulation(self, cluster=False, steps=6000, runs=1, N_cluster=3000):
-        self.simulate(cluster=cluster, steps=steps, runs=runs, N_cluster=N_cluster)
-        return self
     
-    def simulate(self, cluster=False, steps=6000, runs=100, N_cluster=3000):
+    def simulate(self, cluster=False, dinamical=False, steps=6000, runs=100, N_cluster=3000):
         '''
         Run simulation for both original and normalized matrices
         '''
+        print('Start simulation for '+str(self.name))
         
         self.cluster = cluster
         
@@ -233,27 +235,27 @@ class HTC:
             self.Ev, self.sigmaEv, self.Tau, self.sigmaTau, self.Chi, self.sigmaChi,\
             self.spectr, self.act, self.pdf_ev, self.pdf_tau, self.Exc, \
             self.S1, self.S2, self.pdf = \
-            self.run_model(self.W, cluster, steps, runs, N_cluster)
+            self.run_model(self.W, cluster, dinamical, steps, runs, N_cluster)
             
             self.A_norm, self.sigmaA_norm, self.C_norm, self.sigmaC_norm, self.Ent_norm, self.sigmaEnt_norm,\
             self.Ev_norm, self.sigmaEv_norm, self.Tau_norm, self.sigmaTau_norm, self.Chi_norm, self.sigmaChi_norm,\
             self.spectr_norm, self.act_norm, self.pdf_ev_norm, self.pdf_tau_norm, self.Exc_norm, \
             self.S1_norm, self.S2_norm, self.pdf_norm = \
-            self.run_model(normalize(self.W), cluster, steps, runs, N_cluster)
+            self.run_model(normalize(self.W), cluster, dinamical, steps, runs, N_cluster)
         else:
             self.A, self.sigmaA, self.C, self.sigmaC, self.Ent, self.sigmaEnt,\
             self.Ev, self.sigmaEv, self.Tau, self.sigmaTau, self.Chi, self.sigmaChi,\
-            self.spectr, self.act, self.pdf_ev, self.pdf_tau,  self.Exc = self.run_model(self.W, cluster, steps, runs, N_cluster)
+            self.spectr, self.act, self.pdf_ev, self.pdf_tau,  self.Exc = self.run_model(self.W, cluster, dinamical, steps, runs, N_cluster)
             
             self.A_norm, self.sigmaA_norm, self.C_norm, self.sigmaC_norm, self.Ent_norm, self.sigmaEnt_norm,\
             self.Ev_norm, self.sigmaEv_norm, self.Tau_norm, self.sigmaTau_norm, self.Chi_norm, self.sigmaChi_norm,\
             self.spectr_norm, self.act_norm, self.pdf_ev_norm, self.pdf_tau_norm, self.Exc_norm = \
-            self.run_model(normalize(self.W), cluster, steps, runs, N_cluster)
+            self.run_model(normalize(self.W), cluster, dinamical, steps, runs, N_cluster)
         
         print('End simulation for '+str(self.name))
             
     
-    def run_model(self, W, cluster, steps, runs, N_cluster, fract=0.1):
+    def run_model(self, W, cluster, dinamical, steps, runs, N_cluster, fract=0.1):
         '''
         HTC model
         '''
@@ -261,7 +263,11 @@ class HTC:
         dt_cluster = int(steps/N_cluster)
         
         # treshold interval
-        W_mean = np.mean(np.sum(W, axis=1))
+        if np.mean(np.sum(self.W, axis=1)) == 1:
+            W_mean = 1
+        else:
+            W_mean = self.W_mean
+
         Trange = self.Trange * W_mean
         
         # define empty matrix to store results
@@ -275,10 +281,10 @@ class HTC:
         pdf_ev = [Counter() for _ in range(len(Trange))]
         pdf_tau = [Counter() for _ in range(len(Trange))]
         
-        Exc = np.zeros((len(Trange),len(self.stimuli)))
-        
         spectr = []
         act = np.zeros((len(Trange), steps))
+        
+        Exc = np.zeros((len(Trange),len(self.stimuli)))
         
         if cluster:
             S1, S2 = [np.zeros(len(Trange)) for _ in range(2)]
@@ -431,26 +437,27 @@ class HTC:
             # END SUSCEPTIBILITY
             
             # DYNAMICAL RANGE
-            if self.verbose: print('\nSimulating dynamical range...')
+            if dinamical:
+                if self.verbose: print('\nSimulating dynamical range...')
             
-            # Loop over rates
-            for j in ( tqdm(range(len(self.stimuli))) if self.verbose else range(len(self.stimuli))):                
-                S = init_state(self.N, runs, fract)
-                At = np.zeros((runs, steps//10))
+                # Loop over rates
+                for j in ( tqdm(range(len(self.stimuli))) if self.verbose else range(len(self.stimuli))):                
+                    S = init_state(self.N, runs, fract)
+                    At = np.zeros((runs, steps//10))
                 
-                # Loop over time steps
-                for t in range(steps//10):
-                    # update state vector
-                    S, s = update_state(S, W, T, r1=self.stimuli[j], r2=self.r2)
-                    # compute average activity
-                    At[:,t] = np.mean(s, axis=1)
-                # end loop over time steps
-                Exc[i,j] = np.mean(At)
-            # End loop over rates
+                    # Loop over time steps
+                    for t in range(steps//10):
+                        # update state vector
+                        S, s = update_state(S, W, T, r1=self.stimuli[j], r2=self.r2)
+                        # compute average activity
+                        At[:,t] = np.mean(s, axis=1)
+                    # end loop over time steps
+                    Exc[i,j] = np.mean(At)
+                # End loop over rates
             
-            # clear tmp variables
-            del At, S, s
-            # END DYNAMICAL RANGE
+                # clear tmp variables
+                del At, S, s
+                # END DYNAMICAL RANGE
         
         # END LOOP OVER TEMPERATUREs
         if self.verbose:
