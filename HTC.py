@@ -157,7 +157,7 @@ class HTC:
         # add Tmin, Tmax, dT to the name
         self.name += delimiter + str(self.Tmin) + delimiter + str(self.Tmax) \
                     + delimiter + str(self.dT) + delimiter + str(self.ds) \
-                    + delimiter + str(self.Id) + delimiter + str(self.W_mean)
+                    + delimiter + str(self.Id)
         
     
     def generate_network(self):
@@ -220,6 +220,7 @@ class HTC:
         self.stimuli = np.arange(0,1.0+self.ds,self.ds)
         if self.W_mean == None:
             self.W_mean = round( np.mean(np.sum(self.W, axis=1)), 2 )
+        self.name += delimiter + str(self.W_mean)
     
     
     def simulate(self, cluster=False, dinamical=False, steps=6000, runs=100, N_cluster=3000):
