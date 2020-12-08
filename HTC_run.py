@@ -11,7 +11,7 @@ if __name__ == '__main__':
     net = 'random'
     #nets = ['random', 'small', 'barabasi']
     ps = [0.1, 0.2, 0.3, 0.4, 0.5]
-    
+
     # Create directory for results
     folder = 'results/'+net+'/'
     if not os.path.exists(folder):
@@ -32,7 +32,7 @@ if __name__ == '__main__':
     
     # Create computation graph
     mods = client.map(lambda x: HTC(net, dT=0.03, p=x[0], Id=x[1], W_mean=W_means[np.array(ps)==x[0]][0]), sims)
-    processed = client.map(lambda obj: obj.simulate(cluster=True, runs=1) and obj.save(folder), mods)
+    processed = client.map(lambda obj: obj.simulate(folder, cluster=True, runs=1), mods)
 
     # Run the actual computation
     client.gather(processed)

@@ -13,12 +13,9 @@ if __name__ == '__main__':
     
     start = time.time()
     
-    tmp = HTC('connectome', dT=0.03)
+    tmp = HTC('connectome', dT=0.01)
     tmp.verbose=True
-    tmp.simulate(cluster=True, dinamical=True)
-    tmp.save(folder)
+    tmp.simulate(folder, cluster=True, dinamical=True)
     
     stop = time.time()
     print('Total execution time: '+str((stop-start)/60)+'mins')
-
-    client.close()

@@ -223,7 +223,7 @@ class HTC:
         self.name += delimiter + str(self.W_mean)
     
     
-    def simulate(self, cluster=False, dinamical=False, steps=6000, runs=100, N_cluster=3000):
+    def simulate(self, results_folder, cluster=False, dinamical=False, steps=6000, runs=100, N_cluster=3000):
         '''
         Run simulation for both original and normalized matrices
         '''
@@ -254,7 +254,8 @@ class HTC:
             self.run_model(normalize(self.W), cluster, dinamical, steps, runs, N_cluster)
         
         print('End simulation for '+str(self.name))
-            
+        # Save results
+        self.save(results_folder)
     
     def run_model(self, W, cluster, dinamical, steps, runs, N_cluster, fract=0.1):
         '''
@@ -523,3 +524,5 @@ class HTC:
                         self.S1_norm, self.S2_norm), fmt='%e')
             
             write_lists(self.pdf, self.pdf_norm, filename + delimiter + 'pdf.txt')
+        
+        print('Saved '+str(self.name))
