@@ -76,7 +76,7 @@ class plotHTC:
         # length of sketch of time series to be plotted
         N = 200
         
-        Ts = [len(model.Trange)//5, np.argmax(model.S2_norm), len(model.Trange)-len(model.Trange)//3]
+        Ts = [len(model.Trange)//5, np.argmax(model.S2_norm), len(model.Trange)-len(model.Trange)//4]
         
         for i in range(len(Ts)):
             # plot time series

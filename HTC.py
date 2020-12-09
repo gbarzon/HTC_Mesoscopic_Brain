@@ -14,7 +14,7 @@ class HTC:
     def __init__(self, network, W = None,
                  weights='power_law', N=66,
                  Tmin = 0.0, Tmax = 1.5, dT = 0.03, W_mean=None,
-                 ds = 0.01, Id = 0,
+                 Nstim = 100, Id = 0,
                  **kwargs):
         '''
         Class initializer
@@ -31,7 +31,7 @@ class HTC:
         self.Tmax = Tmax
         self.dT = dT
         self.W_mean = W_mean
-        self.ds = ds
+        self.Nstim = Nstim
         self.dt = 0.1
         
         # Unpack parameters
@@ -69,10 +69,11 @@ class HTC:
         elif network == 'powerlaw':
             network, N, k, p = name.split(delimiter)[:4]
         
-        Tmin, Tmax, dT, ds, Id, W_mean = map(float, name.split(delimiter)[-5:])
+        Tmin, Tmax, dT, Nstim, Id, W_mean = map(float, name.split(delimiter)[-6:])
         
         # Create HTC object
-        tmp = cls(network=network, W=W, N=int(N), k=int(k), p=float(p), Tmin=Tmin, Tmax=Tmax, dT=dT, ds=ds, Id=Id, W_mean=W_mean)
+        tmp = cls(network=network, W=W, N=int(N), k=int(k), p=float(p), Tmin=Tmin,
+                  Tmax=Tmax, dT=dT, Nstim=Nstim, Id=Id, W_mean=W_mean)
         
         # Load time series
         act = np.loadtxt(filename+delimiter+str('series.txt'))
@@ -156,7 +157,7 @@ class HTC:
             
         # add Tmin, Tmax, dT to the name
         self.name += delimiter + str(self.Tmin) + delimiter + str(self.Tmax) \
-                    + delimiter + str(self.dT) + delimiter + str(self.ds) \
+                    + delimiter + str(self.dT) + delimiter + str(self.Nstim) \
                     + delimiter + str(self.Id)
         
     
@@ -217,7 +218,7 @@ class HTC:
         self.r2 = self.r1**(1./5.)
         self.Tc = self.r2 / (1. + 2.*self.r2)
         self.Trange = np.arange(self.Tmin, self.Tmax+self.dT, self.dT) * self.Tc
-        self.stimuli = np.arange(0,1.0+self.ds,self.ds)
+        self.stimuli = np.log10( np.logspace(1e-5, 1, self.Nstim, endpoint=True) )
         if self.W_mean == None:
             self.W_mean = round( np.mean(np.sum(self.W, axis=1)), 2 )
         self.name += delimiter + str(self.W_mean)
@@ -301,6 +302,7 @@ class HTC:
             
         # LOOP OVER TEMPERATUREs
         for i,T in enumerate(Trange):
+            '''
             if self.verbose:
                 clear_output(wait=True)
                 #print(self.title + '\n')
@@ -437,7 +439,7 @@ class HTC:
             # clear tmp variables
             del temp_chi, temp_act
             # END SUSCEPTIBILITY
-            
+            '''
             # DYNAMICAL RANGE
             if dinamical:
                 if self.verbose: print('\nSimulating dynamical range...')
