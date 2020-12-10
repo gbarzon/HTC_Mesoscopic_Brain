@@ -70,6 +70,10 @@ def get_mean_HTC(folder, name, N):
         mean.S1_norm += mod.S1_norm
         mean.S2_norm += mod.S2_norm
         
+        # Dinamical range
+        mean.Exc += mod.Exc
+        mean.Exc_norm += mod.Exc_norm
+        
         for i in range(len(pdf_ev)):
             # Spectr
             mean.spectr[i][1] += mod.spectr[i][1]
@@ -103,6 +107,10 @@ def get_mean_HTC(folder, name, N):
     mean.Tau_norm/N, mean.sigmaTau_norm/N, mean.Chi_norm/N, mean.sigmaChi_norm/N, \
     mean.S1_norm/N, mean.S2_norm/N
     
+    # Dinamical range
+    mean.Exc /= N
+    mean.Exc_norm /= N
+    
     # Divide by N power spectrum
     for i in range(len(pdf_ev)):
         mean.spectr[i][1] /= N
@@ -124,4 +132,4 @@ def get_mean_HTC(folder, name, N):
             if not 'observables' in str(file):
                 file.unlink()
                 
-    mean.save(folder, cluster=True, dinamical=False)
+    mean.save(folder, cluster=True, dinamical=True)
