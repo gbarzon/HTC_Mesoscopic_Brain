@@ -41,7 +41,7 @@ def write_lists(lst, lst_norm, fname):
 
 def read_lists(fname):
     ''' Read lists of numpy vectors from .txt file'''
-    text_file = open(fname, "r")
+    text_file = open(fname, 'r')
     lines = text_file.read().split('\n\n')
     del lines[-1]
 

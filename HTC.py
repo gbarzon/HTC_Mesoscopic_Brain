@@ -3,6 +3,7 @@ import networkx as nx
 
 from tqdm.auto import tqdm
 from IPython.display import clear_output
+from pathlib import Path
 
 from HTC_utils import *
 
@@ -11,10 +12,10 @@ delimiter = '_'
 
 class HTC:
     
-    def __init__(self, network, W = None,
+    def __init__(self, network, generator=True, W = None,
                  weights='power_law', N=66,
                  Tmin = 0.0, Tmax = 1.5, dT = 0.03, W_mean=None,
-                 Nstim = 100, Id = 0,
+                 Nstim = 20, Id = 0,
                  **kwargs):
         '''
         Class initializer
@@ -38,13 +39,11 @@ class HTC:
         self.unpack_parameters(**kwargs)
         
         # Create network topology and compute parameters
-        self.generate_network()
+        if generator:
+            self.generate_network()
         self.compute_parameters()
         
         print('CREATED ' + self.title + ', id=' + str(self.Id) + ' ...\n')
-        # Check if the network is connected
-        if not nx.is_connected(nx.from_numpy_matrix(self.W)):
-            print('WARNING: the network is not connected')
         
      
     @classmethod
@@ -53,7 +52,7 @@ class HTC:
         network = name.split(delimiter)[0]
         
         # Load weights matrix
-        W = np.loadtxt(filename+delimiter+'matrix.txt')
+        #W = np.loadtxt(filename+delimiter+'matrix.txt')
         
         # Unpack parameters from name
         N, k, p = [0, 0, 0]
@@ -69,16 +68,18 @@ class HTC:
         elif network == 'powerlaw':
             network, N, k, p = name.split(delimiter)[:4]
         
-        Tmin, Tmax, dT, Nstim, Id, W_mean = map(float, name.split(delimiter)[-6:])
+        Tmin, Tmax, dT, Nstim, W_mean, Id = map(float, name.split(delimiter)[-6:])
+        Nstim, Id = int(Nstim), int(Id)
         
         # Create HTC object
-        tmp = cls(network=network, W=W, N=int(N), k=int(k), p=float(p), Tmin=Tmin,
-                  Tmax=Tmax, dT=dT, Nstim=Nstim, Id=Id, W_mean=W_mean)
+        tmp = cls(network=network, N=int(N), k=int(k), p=float(p), Tmin=Tmin,
+                  Tmax=Tmax, dT=dT, Nstim=Nstim, Id=Id, W_mean=W_mean, generator=False)
         
-        # Load time series
-        act = np.loadtxt(filename+delimiter+str('series.txt'))
-        tmp.act, tmp.act_norm = act[:len(act)//2], act[len(act)//2:]
-        del act
+        # Load time series (if present)
+        if Path(filename+delimiter+str('series.txt')).is_file():
+            act = np.loadtxt(filename+delimiter+str('series.txt'))
+            tmp.act, tmp.act_norm = act[:len(act)//2], act[len(act)//2:]
+            del act
         
         # Load power spectrum
         tmp.spectr, tmp.spectr_norm = read_lists(filename+delimiter+str('spectrum.txt'))
@@ -87,10 +88,11 @@ class HTC:
         tmp.pdf_ev, tmp.pdf_ev_norm = read_lists(filename+delimiter+'pdf_ev.txt')
         tmp.pdf_tau, tmp.pdf_tau_norm = read_lists(filename+delimiter+'pdf_tau.txt')
         
-        # Load stimulated activity
-        exc = np.loadtxt(filename+delimiter+str('stimulated.txt'))
-        tmp.Exc, tmp.Exc_norm = exc[:len(exc)//2], exc[len(exc)//2:]
-        del exc
+        # Load stimulated activity (if present)
+        if Path(filename+delimiter+str('stimulated.txt')).is_file():
+            exc = np.loadtxt(filename+delimiter+str('stimulated.txt'))
+            tmp.Exc, tmp.Exc_norm = exc[:len(exc)//2], exc[len(exc)//2:]
+            del exc
         
         # Load activity and (if present) cluster size
         obs = np.loadtxt(filename+delimiter+str('observables.txt'))
@@ -157,8 +159,7 @@ class HTC:
             
         # add Tmin, Tmax, dT to the name
         self.name += delimiter + str(self.Tmin) + delimiter + str(self.Tmax) \
-                    + delimiter + str(self.dT) + delimiter + str(self.Nstim) \
-                    + delimiter + str(self.Id)
+                    + delimiter + str(self.dT) + delimiter + str(self.Nstim)
         
     
     def generate_network(self):
@@ -221,7 +222,7 @@ class HTC:
         self.stimuli = np.log10( np.logspace(1e-5, 1, self.Nstim, endpoint=True) )
         if self.W_mean == None:
             self.W_mean = round( np.mean(np.sum(self.W, axis=1)), 2 )
-        self.name += delimiter + str(self.W_mean)
+        self.name += delimiter + str(self.W_mean) + delimiter + str(self.Id)
     
     
     def simulate(self, results_folder, cluster=False, dinamical=False, steps=6000, runs=100, N_cluster=3000):
@@ -229,9 +230,7 @@ class HTC:
         Run simulation for both original and normalized matrices
         '''
         print('Start simulation for '+str(self.name))
-        
-        self.cluster = cluster
-        
+                
         if cluster:
             self.A, self.sigmaA, self.C, self.sigmaC, self.Ent, self.sigmaEnt,\
             self.Ev, self.sigmaEv, self.Tau, self.sigmaTau, self.Chi, self.sigmaChi,\
@@ -256,7 +255,7 @@ class HTC:
         
         print('End simulation for '+str(self.name))
         # Save results
-        self.save(results_folder)
+        self.save(results_folder, cluster, dinamical)
     
     def run_model(self, W, cluster, dinamical, steps, runs, N_cluster, fract=0.1):
         '''
@@ -302,7 +301,6 @@ class HTC:
             
         # LOOP OVER TEMPERATUREs
         for i,T in enumerate(Trange):
-            '''
             if self.verbose:
                 clear_output(wait=True)
                 #print(self.title + '\n')
@@ -439,7 +437,7 @@ class HTC:
             # clear tmp variables
             del temp_chi, temp_act
             # END SUSCEPTIBILITY
-            '''
+            
             # DYNAMICAL RANGE
             if dinamical:
                 if self.verbose: print('\nSimulating dynamical range...')
@@ -488,7 +486,7 @@ class HTC:
                     spectr, act, pdf_ev, pdf_tau, Exc)
         
         
-    def save(self, results_folder):
+    def save(self, results_folder, cluster, dinamical):
         '''
         Save output
         '''        
@@ -496,19 +494,22 @@ class HTC:
         filename = results_folder+self.name
         
         # Save weights matrix
-        np.savetxt(filename + delimiter + 'matrix.txt', self.W)
+        #np.savetxt(filename + delimiter + 'matrix.txt', self.W)
+        
         # Save activity
-        np.savetxt(filename + delimiter + 'series.txt', np.vstack((self.act, self.act_norm)), fmt='%e')
+        #np.savetxt(filename + delimiter + 'series.txt', np.vstack((self.act, self.act_norm)), fmt='%e')
         
         # Save power spectrum
         write_lists(self.spectr, self.spectr_norm, filename + delimiter + 'spectrum.txt')
         # Save pdfs
         write_lists(self.pdf_ev, self.pdf_ev_norm, filename + delimiter + 'pdf_ev.txt')
         write_lists(self.pdf_tau, self.pdf_tau_norm, filename + delimiter + 'pdf_tau.txt')
-        # Save stimulated activity
-        np.savetxt(filename + delimiter + 'stimulated.txt', np.vstack((self.Exc, self.Exc_norm)), fmt='%e')
         
-        if not self.cluster:
+        # Save stimulated activity
+        if dinamical:
+            np.savetxt(filename + delimiter + 'stimulated.txt', np.vstack((self.Exc, self.Exc_norm)), fmt='%e')
+        
+        if not cluster:
             np.savetxt(filename + delimiter + 'observables.txt',
                        (self.A, self.sigmaA, self.C, self.sigmaC, self.Ent, self.sigmaEnt,
                         self.Ev, self.sigmaEv, self.Tau, self.sigmaTau, self.Chi, self.sigmaChi,
