@@ -506,10 +506,11 @@ class HTC:
         #np.savetxt(filename + delimiter + 'matrix.txt', self.W)
         
         # Save activity
-        #np.savetxt(filename + delimiter + 'series.txt', np.vstack((self.act, self.act_norm)), fmt='%e')
+        if self.network == 'connectome':
+            np.savetxt(filename + delimiter + 'series.txt', np.vstack((self.act, self.act_norm)), fmt='%e')
         
         # Save power spectrum
-        np.savetxt(filename + delimiter + 'spectrum.txt', (self.spectr, self.spectr_norm), fmt='%e')
+        np.savetxt(filename + delimiter + 'spectrum.txt', np.vstack((self.spectr, self.spectr_norm)), fmt='%e')
         # Save pdfs
         write_lists(self.pdf_ev, self.pdf_ev_norm, filename + delimiter + 'pdf_ev.txt')
         write_lists(self.pdf_tau, self.pdf_tau_norm, filename + delimiter + 'pdf_tau.txt')

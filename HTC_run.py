@@ -12,6 +12,7 @@ if __name__ == '__main__':
     
     # Simulation parameters
     N = 66
+    dT = 0.03
     runs = 100
     ps = [0.1, 0.2, 0.3, 0.4, 0.5]
     
@@ -34,9 +35,9 @@ if __name__ == '__main__':
         for i, p in enumerate(ps):
             # Create fake HTC
             if net == 'random':
-                tmp = HTC(net, N=N, dT=0.1, p=p)
+                tmp = HTC(net, N=N, dT=dT, p=p)
             else:
-                tmp = HTC(net, N=N, dT=0.1, k=int(p*N), p=0.5)
+                tmp = HTC(net, N=N, dT=dT, k=int(p*N), p=0.5)
             W_means[i] = tmp.W_mean
             names.append(tmp.name.rsplit('_', 1)[0])
             
@@ -47,9 +48,9 @@ if __name__ == '__main__':
     
         # Init computation graph
         if net == 'random':
-            mods = client.map(lambda x: HTC(net, N=N, dT=0.03, p=x[0], Id=x[1], W_mean=W_means[np.array(ps)==x[0]][0]), sims)
+            mods = client.map(lambda x: HTC(net, N=N, dT=dT, p=x[0], Id=x[1], W_mean=W_means[np.array(ps)==x[0]][0]), sims)
         else:
-            mods = client.map(lambda x: HTC(net, N=N, dT=0.03, k=int(x[0]*N), Id=x[1], W_mean=W_means[np.array(ps)==x[0]][0]), sims)
+            mods = client.map(lambda x: HTC(net, N=N, dT=dT, k=int(x[0]*N), Id=x[1], W_mean=W_means[np.array(ps)==x[0]][0]), sims)
         
         # Complete computation graph
         processed = client.map(lambda obj: obj.simulate(folder, cluster=True, dinamical=True, runs=1), mods)
