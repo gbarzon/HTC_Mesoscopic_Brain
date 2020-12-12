@@ -82,7 +82,9 @@ class HTC:
             del act
         
         # Load power spectrum
-        tmp.spectr, tmp.spectr_norm = read_lists(filename+delimiter+str('spectrum.txt'))
+        spectr = np.loadtxt(filename+delimiter+str('spectrum.txt'))
+        tmp.spectr, tmp.spectr_norm = spectr[:len(spectr)//2, len(spectr)//2]
+        del spectr
         
         # Load pdfs
         tmp.pdf_ev, tmp.pdf_ev_norm = read_lists(filename+delimiter+'pdf_ev.txt')
@@ -265,10 +267,14 @@ class HTC:
         dt_cluster = int(steps/N_cluster)
         
         # treshold interval
-        if np.mean(np.sum(self.W, axis=1)) == 1:
+        if np.mean(np.sum(W, axis=1)) == 1:
             W_mean = 1
         else:
             W_mean = self.W_mean
+        print(W_mean)
+        import time
+        time.sleep(5)
+        
 
         Trange = self.Trange * W_mean
         
@@ -294,7 +300,7 @@ class HTC:
 
         if self.verbose:
             print(self.title)
-            if W_mean==1.:
+            if W_mean==1:
                 print('START SIMULATION WITH NORMALIZED MATRIX...')
             else:
                 print('START SIMULATION WITH ORIGINAL MATRIX...')
@@ -470,6 +476,9 @@ class HTC:
         # Reshape pdfs
         pdf_ev = reshape_pdf(pdf_ev)
         pdf_tau = reshape_pdf(pdf_tau)
+        
+        # Reshape spcetrum
+        spectr = np.vstack(spectr)
 
         # RETURN RESULTS
         if cluster:
@@ -500,7 +509,7 @@ class HTC:
         #np.savetxt(filename + delimiter + 'series.txt', np.vstack((self.act, self.act_norm)), fmt='%e')
         
         # Save power spectrum
-        write_lists(self.spectr, self.spectr_norm, filename + delimiter + 'spectrum.txt')
+        np.savetxt(filename + delimiter + 'spectrum.txt', (self.spectr, self.spectr_norm), fmt='%e')
         # Save pdfs
         write_lists(self.pdf_ev, self.pdf_ev_norm, filename + delimiter + 'pdf_ev.txt')
         write_lists(self.pdf_tau, self.pdf_tau_norm, filename + delimiter + 'pdf_tau.txt')

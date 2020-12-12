@@ -47,9 +47,9 @@ if __name__ == '__main__':
     
         # Init computation graph
         if net == 'random':
-            mods = client.map(lambda x: HTC(net, N=N dT=0.03, p=x[0], Id=x[1], W_mean=W_means[np.array(ps)==x[0]][0]), sims)
+            mods = client.map(lambda x: HTC(net, N=N, dT=0.03, p=x[0], Id=x[1], W_mean=W_means[np.array(ps)==x[0]][0]), sims)
         else:
-            mods = client.map(lambda x: HTC(net, N=N dT=0.03, k=int(x[0]*N), Id=x[1], W_mean=W_means[np.array(ps)==x[0]][0]), sims)
+            mods = client.map(lambda x: HTC(net, N=N, dT=0.03, k=int(x[0]*N), Id=x[1], W_mean=W_means[np.array(ps)==x[0]][0]), sims)
         
         # Complete computation graph
         processed = client.map(lambda obj: obj.simulate(folder, cluster=True, dinamical=True, runs=1), mods)

@@ -1,5 +1,5 @@
 from HTC import HTC
-from HTC_utils import reshape_pdf
+from HTC_utils import reshape_pdf, get_Tc
 from collections import Counter
 from pathlib import Path
 
@@ -19,13 +19,15 @@ def get_mean_HTC(folder, name, N):
     Clean the related files, leaving only '*_observables.txt'
     '''
     
-    # Initialize list for saving TCs
-    
     # Load first HTC model
-    mean = HTC.loadFromName(folder+name+str(0))
+    mean = HTC.loadFromName(folder+name+'_'+str(0))
     # Change Id
     mean.Id = -1
     mean.name = mean.name.rsplit('_', 1)[0] + '_' + str(mean.Id)
+    
+    # Initialize list for saving Tc's
+    Tcs = np.zeros(len(mean.Trange))
+    Tc_norm = np.zeros(len(mean.Trange))
     
     # Load pdfs
     pdf_ev = [list_to_counter(x) for x in mean.pdf_ev]
@@ -69,6 +71,9 @@ def get_mean_HTC(folder, name, N):
         mean.sigmaChi_norm += mod.sigmaChi_norm
         mean.S1_norm += mod.S1_norm
         mean.S2_norm += mod.S2_norm
+        
+        # Tc
+        Tc[i], Tc_norm[i] = get_Tc(mod)
         
         # Dinamical range
         mean.Exc += mod.Exc
@@ -124,7 +129,6 @@ def get_mean_HTC(folder, name, N):
     mean.pdf = reshape_pdf(pdf)
     mean.pdf_norm = reshape_pdf(pdf_norm)
     
-    
     # Clean folder
     path = Path(folder)
     for file in path.iterdir():
@@ -132,4 +136,8 @@ def get_mean_HTC(folder, name, N):
             if not 'observables' in str(file):
                 file.unlink()
                 
+    # Save mean object            
     mean.save(folder, cluster=True, dinamical=True)
+    # Save Tc's
+    np.savetxt(folder+name+'_'+'Tc.txt', (Tc, Tc_norm), fmt='%e')
+    

@@ -167,14 +167,14 @@ def avg_pow_spec(data):
     Compute the average power spectrum of a collection of time series
     using a periodogram.
     - Input: data(runs,steps), timestep
-    - Output: frequencies, power spectrum
+    - Output: power spectrum
     '''
     spectr = np.array(list(map(power_spectrum, data)))
     
-    freq = spectr[0,0]
+    #freq = spectr[0,0]
     spectr = np.mean(spectr[:,1], axis=0)
     
-    return np.array([freq, spectr])
+    return spectr
 
 
 def interevent(data):
@@ -195,3 +195,38 @@ def interevent(data):
     dt = np.append(dt, [steps]*not_active)
     
     return np.mean(dt), np.std(dt), Counter(dt)
+
+def get_dynamical_range(mod):
+    '''
+    Compute the dynamical range
+    '''
+    def find_nearest(array, value):
+        idx = (np.abs(array - value)).argmin()
+        return idx
+    
+    delta = np.zeros(len(mod.Trange))
+    delta_norm = np.zeros(len(mod.Trange))
+    
+    for i in range(len(mod.Exc)):
+        Amax, Amin = np.max(mod.Exc[i]), np.min(mod.Exc[i])
+        s90 = find_nearest(mod.Exc[i], 0.9*(Amax-Amin))
+        s10 = find_nearest(mod.Exc[i], 0.1*(Amax-Amin))
+        
+        delta[i] = 10*np.log10(mod.stimuli[s90] / mod.stimuli[s10])
+    
+        Amax, Amin = np.max(mod.Exc_norm[i]), np.min(mod.Exc_norm[i])
+        s90 = find_nearest(mod.Exc_norm[i], 0.9*(Amax-Amin) )
+        s10 = find_nearest(mod.Exc_norm[i], 0.1*(Amax-Amin))
+        
+        delta_norm[i] = 10*np.log10(mod.stimuli[s90] / mod.stimuli[s10])
+        
+    return delta, delta_norm
+
+def get_Tc(mod):
+    '''
+    Get critical parameter, define as the maximum of S2
+    '''
+    Tc = mod.Trange[np.argmax(mod.S2)] * mod.W_mean
+    Tc_norm = mod.Trange[np.argmax(mod.S2_norm)]
+    
+    return Tc, Tc_norm

@@ -7,13 +7,13 @@ import itertools
 if __name__ == '__main__':
     
     # Create directory for results
-    folder = 'results/connectome'
+    folder = 'results/connectome/'
     if not os.path.exists(folder):
         os.makedirs(folder)
     
     start = time.time()
     
-    tmp = HTC('connectome', dT=0.01)
+    tmp = HTC('connectome', dT=0.01, Nstim=50)
     tmp.verbose=True
     tmp.simulate(folder, cluster=True, dinamical=True)
     
