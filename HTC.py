@@ -271,10 +271,6 @@ class HTC:
             W_mean = 1
         else:
             W_mean = self.W_mean
-        print(W_mean)
-        import time
-        time.sleep(5)
-        
 
         Trange = self.Trange * W_mean
         

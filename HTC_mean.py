@@ -1,5 +1,6 @@
 from HTC import HTC
-from HTC_utils import reshape_pdf, get_Tc
+from HTC_utils import reshape_pdf, get_Tc, normalize
+from scipy.linalg import eigh as largest_eig
 from collections import Counter
 from pathlib import Path
 
@@ -25,10 +26,10 @@ def get_mean_HTC(folder, name, N):
     mean.Id = -1
     mean.name = mean.name.rsplit('_', 1)[0] + '_' + str(mean.Id)
     
-    # Initialize list for saving Tc's
-    Tcs = np.zeros(len(mean.Trange))
-    Tc_norm = np.zeros(len(mean.Trange))
-    
+    # Initialize list for saving In-Degree, Lambda, Tc's
+    param = np.zeros(len(mean.Trange), 3)
+    param_norm = np.zeros(len(mean.Trange), 3)
+        
     # Load pdfs
     pdf_ev = [list_to_counter(x) for x in mean.pdf_ev]
     pdf_tau = [list_to_counter(x) for x in mean.pdf_tau]
@@ -73,7 +74,21 @@ def get_mean_HTC(folder, name, N):
         mean.S2_norm += mod.S2_norm
         
         # Tc
-        Tc[i], Tc_norm[i] = get_Tc(mod)
+        param[i, 0], param_norm[i, 0] = get_Tc(mod)
+        
+        # Degree
+        W, W_norm = mod.W, normalize(mod.W)
+        
+        g = igraph.Graph.Adjacency((mod.W > 0).tolist())
+        g.es['weight'] = W[W.nonzero()]
+        deg = np.mean(g.strength(mode='IN', weights = g.es['weight']))
+        deg_norm = 1.
+        param[i, 1], param_norm[i, 1] = deg, deg_norm
+        
+        # Lambda
+        lmbd = largest_eig(W, eigvals=(W.shape[0]-1,W.shape[0]-1), eigvals_only=True)
+        lmbd_norm = largest_eig(W_norm, eigvals=(W.shape[0]-1,W.shape[0]-1), eigvals_only=True)
+        param[i, 2], param_norm[i, 2] = lmbd, lmbd_norm
         
         # Dinamical range
         mean.Exc += mod.Exc
@@ -139,5 +154,5 @@ def get_mean_HTC(folder, name, N):
     # Save mean object            
     mean.save(folder, cluster=True, dinamical=True)
     # Save Tc's
-    np.savetxt(folder+name+'_'+'Tc.txt', (Tc, Tc_norm), fmt='%e')
+    np.savetxt(folder+name+'_'+'Tc.txt', np.vstack(param, param_norm), fmt='%e')
     
