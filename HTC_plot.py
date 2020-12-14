@@ -10,14 +10,14 @@ class plotHTC:
         #self.model = model
         
         
-    def template_plot(self, Trange, Tc, var1, var1_norm, name1,
+    def template_plot(self, Trange, Tc, Tc_norm, var1, var1_norm, name1,
                       var2=None, var2_norm=None, name2=None,
                       title=None, derivative=False):
         fig, ax1 = plt.subplots(figsize=(12,6))
         plt.grid()
 
         ax1.plot(Trange/Tc, var1, label=r'${}$'.format(name1), c='black')
-        ax1.plot(Trange/Tc, var1_norm, label=r'${}_{{norm}}$'.format(name1), c='red')
+        ax1.plot(Trange/Tc_norm, var1_norm, label=r'${}_{{norm}}$'.format(name1), c='red')
         ax1.set_xlabel(r'$T/T_c$', size=12)
         ax1.set_ylabel(r'${}$'.format(name1), size=12)
 
@@ -25,10 +25,10 @@ class plotHTC:
         if not var2 is None:
             if derivative:
                 ax2.plot(Trange[1:]/Tc, var2, '-.', label=r'${}$'.format(name2), c='black')
-                ax2.plot(Trange[1:]/Tc, var2_norm, '-.', label=r'${}_{{norm}}$'.format(name2), c='red')
+                ax2.plot(Trange[1:]/Tc_norm, var2_norm, '-.', label=r'${}_{{norm}}$'.format(name2), c='red')
             else:
                 ax2.plot(Trange/Tc, var2, '-.', label=r'${}$'.format(name2), c='black')
-                ax2.plot(Trange/Tc, var2_norm, '-.', label=r'${}_{{norm}}$'.format(name2), c='red')
+                ax2.plot(Trange/Tc_norm, var2_norm, '-.', label=r'${}_{{norm}}$'.format(name2), c='red')
             ax2.set_ylabel(r'${}$'.format(name2), size=12)
 
         h1, l1 = ax1.get_legend_handles_labels()
@@ -37,34 +37,37 @@ class plotHTC:
         plt.title(r'${}$'.format(title), size=13)
 
         fig.tight_layout()
-        plt.show() 
+        plt.show()
         
         
     def plot_variable(self, model, var_to_print):
+        Tc = np.argmax(model.S2) / (len(model.Trange)-1) * model.Tmax
+        Tc_norm = np.argmax(model.S2_norm) / (len(model.Trange)-1) * model.Tmax
+        
         if var_to_print == 'act':
-            self.template_plot(model.Trange, model.Tc, model.A, model.A_norm, 'A',
+            self.template_plot(model.Trange, model.Tc*Tc, model.Tc*Tc_norm, model.A, model.A_norm, 'A',
                               model.sigmaA, model.sigmaA_norm, '\sigma(A)', model.title)
         elif var_to_print == 'cluster':
-            self.template_plot(model.Trange, model.Tc, model.S1, model.S1_norm, 'S1',
+            self.template_plot(model.Trange, model.Tc*Tc, model.Tc*Tc_norm, model.S1, model.S1_norm, 'S1',
                               model.S2, model.S2_norm, 'S2', model.title)
         elif var_to_print == 'corr':
-            self.template_plot(model.Trange, model.Tc, model.C, model.C_norm, 'C',
+            self.template_plot(model.Trange, model.Tc*Tc, model.Tc*Tc_norm, model.C, model.C_norm, 'C',
                               model.sigmaC, model.sigmaC_norm, '\sigma(C)', model.title)
         elif var_to_print == 'ent':
-            self.template_plot(model.Trange, model.Tc, model.Ent, model.Ent_norm, 'Ent',
+            self.template_plot(model.Trange, model.Tc*Tc, model.Tc*Tc_norm, model.Ent, model.Ent_norm, 'Ent',
                               model.sigmaEnt, model.sigmaEnt_norm, '\sigma(Ent)', model.title)
         elif var_to_print == 'interevent':
-            self.template_plot(model.Trange, model.Tc, model.Ev, model.Ev_norm, 't(ev)',
+            self.template_plot(model.Trange, model.Tc*Tc, model.Tc*Tc_norm, model.Ev, model.Ev_norm, 't(ev)',
                               (model.Ev[1:]-model.Ev[:-1])/model.dT,
                                (model.Ev_norm[1:]-model.Ev_norm[:-1])/model.dT,
                                't\prime(ev)', model.title, derivative=True)
         elif var_to_print == 'tau':
-            self.template_plot(model.Trange, model.Tc, model.Tau, model.Tau_norm, '\\tau',
+            self.template_plot(model.Trange, model.Tc*Tc, model.Tc*Tc_norm, model.Tau, model.Tau_norm, '\\tau',
                                -(model.Tau[1:]-model.Tau[:-1])/model.dT,
                                -(model.Tau_norm[1:]-model.Tau_norm[:-1])/model.dT,
                                '- \\tau \prime', model.title, derivative=True)
         elif var_to_print == 'chi':
-            self.template_plot(model.Trange, model.Tc, model.Chi, model.Chi_norm, '\\chi',
+            self.template_plot(model.Trange, model.Tc*Tc, model.Tc*Tc_norm, model.Chi, model.Chi_norm, '\\chi',
                                title=model.title)
             
         
@@ -113,11 +116,13 @@ class plotHTC:
             # plot power spectrum
             ax = plt.subplot(4, len(Ts), i+1+2*len(Ts))
             
-            plt.plot(model.spectr[Ts[i]][0], model.spectr[Ts[i]][1], alpha=0.7, label=r'$P$', c='black')
-            plt.plot(model.spectr_norm[Ts[i]][0], model.spectr_norm[Ts[i]][1], alpha=0.7, label=r'$P_{norm}$', c='red')
+            freq = np.arange(len(model.spectr[0])) / len(model.spectr[0])
+            
+            plt.plot(freq, model.spectr[Ts[i]], alpha=0.7, label=r'$P$', c='black')
+            plt.plot(freq, model.spectr_norm[Ts[i]], alpha=0.7, label=r'$P_{norm}$', c='red')
             plt.xlabel('f', size=13)
             
-            plt.ylim( [0.0, np.max(model.spectr_norm[Ts[1]][1]) + 0.1*np.max(model.spectr_norm[Ts[1]][1])] )
+            plt.ylim( [0.0, np.max(model.spectr_norm[Ts[1]]) + 0.1*np.max(model.spectr_norm[Ts[1]])] )
             plt.grid()
             
             if i==len(Ts)-1:
@@ -152,7 +157,111 @@ class plotHTC:
                 plt.ylabel(r'$pdf(s)$', size=13)
 
         plt.show()
+        
+    def plot_stimulated(self, mod):
+        from matplotlib import cm
+        from HTC_utils import find_nearest
+        
+        plt.figure(figsize=(20,6))
+
+        Trange = mod.Trange / mod.Tc / mod.Tmax / np.argmax(mod.S2) * (len(mod.Trange)-1)
+        Trange_norm = mod.Trange / mod.Tc / mod.Tmax / np.argmax(mod.S2_norm) * (len(mod.Trange)-1)
+
+        cm1 = cm.get_cmap('viridis')
+        #cm1 = cm.get_cmap('gray')
+        #cm1 = cm.get_cmap('autumn')
+        fact = 7.5
+
+        # Act vs. stimuli - original network
+        plt.subplot(1, 2, 1)
+        plt.xscale('log')
+        #plt.yscale('log')
+        plt.grid()
+        plt.xlabel('stimulus s', size=13)
+        plt.ylabel('A', size=13)
+
+        for i in range(2,8):
+            val = 0.2 * i
+            ind = find_nearest(Trange, val)
     
+            plt.plot(mod.stimuli, mod.Exc[ind], lw=2, c=cm1(i/fact), label='T='+str(round(val,1))+'*Tc')
+        plt.legend(fontsize=12, title=r'W')
+        
+        # Act vs. stimuli - normalized network
+        plt.subplot(1, 2, 2)
+        plt.xscale('log')
+        #plt.yscale('log')
+        plt.grid()
+        plt.xlabel('stimulus s', size=13)
+        plt.ylabel('A', size=13)
+
+        for i in range(2,8):
+            val = 0.2 * i
+            ind = find_nearest(Trange_norm, val)
+    
+            plt.plot(mod.stimuli, mod.Exc_norm[ind], '-.', lw=2, c=cm1(i/fact), label='T='+str(round(val,1))+'*Tc')
+        plt.legend(fontsize=12, title=r'$W_{norm}$')
+    
+    def plot_dynamical_range(self, mod):
+        from matplotlib import cm
+        from HTC_utils import find_nearest
+
+        plt.figure(figsize=(20,6))
+
+        Trange = mod.Trange / mod.Tc / mod.Tmax / np.argmax(mod.S2) * (len(mod.Trange)-1)
+        Trange_norm = mod.Trange / mod.Tc / mod.Tmax / np.argmax(mod.S2_norm) * (len(mod.Trange)-1)
+
+        cm1 = cm.get_cmap('viridis')
+        #cm1 = cm.get_cmap('gray')
+        #cm1 = cm.get_cmap('autumn')
+        fact = 7.5
+
+        # Act vs. stimuli - original network
+        plt.subplot(1, 3, 1)
+        plt.xscale('log')
+        plt.yscale('log')
+        plt.grid()
+        plt.xlabel('stimulus s', size=13)
+        plt.ylabel('A', size=13)
+
+        for i in range(2,8):
+            val = 0.2 * i
+            ind = find_nearest(Trange, val)
+    
+            plt.plot(mod.stimuli, mod.Exc[ind], lw=2, c=cm1(i/fact), label='T='+str(round(val,1))+'*Tc')
+        plt.legend(fontsize=12, title=r'W')
+        
+        # Act vs. stimuli - normalized network
+        plt.subplot(1, 3, 2)
+        plt.xscale('log')
+        plt.yscale('log')
+        plt.grid()
+        plt.xlabel('stimulus s', size=13)
+        plt.ylabel('A', size=13)
+
+        for i in range(2,8):
+            val = 0.2 * i
+            ind = find_nearest(Trange_norm, val)
+    
+            plt.plot(mod.stimuli, mod.Exc_norm[ind], '-.', lw=2, c=cm1(i/fact), label='T='+str(round(val,1))+'*Tc')
+        plt.legend(fontsize=12, title=r'$W_{norm}$')
+    
+        # Dynamical range
+        from HTC_utils import get_dynamical_range
+        delta, delta_norm = get_dynamical_range(mod)
+
+        plt.subplot(1, 3, 3)
+        plt.scatter(mod.Trange/mod.Tc, delta, c='k', s=18, alpha=0.6, label=r'$W$')
+        #plt.plot(mod.Trange/mod.Tc, delta, c='k')
+        plt.scatter(mod.Trange/mod.Tc, delta_norm, c='r', s=18, alpha=0.5, label=r'$W_{norm}$')
+        #plt.plot(mod.Trange/mod.Tc, delta_norm, c='r')
+
+        plt.xlabel(r'$T/T_c$', size=13)
+        plt.ylabel(r'$ dynamical \ range \ \Delta$', size=13)
+        plt.grid()
+        plt.legend(fontsize=12)
+
+        plt.show()
     
     def draw_network(self, model):
         G = nx.from_numpy_matrix(model.W)

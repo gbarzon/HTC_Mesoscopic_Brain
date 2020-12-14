@@ -83,7 +83,7 @@ class HTC:
         
         # Load power spectrum
         spectr = np.loadtxt(filename+delimiter+str('spectrum.txt'))
-        tmp.spectr, tmp.spectr_norm = spectr[:len(spectr)//2, len(spectr)//2]
+        tmp.spectr, tmp.spectr_norm = spectr[:len(spectr)//2], spectr[len(spectr)//2:]
         del spectr
         
         # Load pdfs
@@ -221,7 +221,7 @@ class HTC:
         self.r2 = self.r1**(1./5.)
         self.Tc = self.r2 / (1. + 2.*self.r2)
         self.Trange = np.arange(self.Tmin, self.Tmax+self.dT, self.dT) * self.Tc
-        self.stimuli = np.logspace(-5, 1, self.Nstim, endpoint=True)
+        self.stimuli = np.logspace(-5, 0, self.Nstim, endpoint=True)
         if self.W_mean == None:
             self.W_mean = round( np.mean(np.sum(self.W, axis=1)), 2 )
         self.name += delimiter + str(self.W_mean) + delimiter + str(self.Id)

@@ -196,29 +196,31 @@ def interevent(data):
     
     return np.mean(dt), np.std(dt), Counter(dt)
 
+
+# ANALYSIS POST-SIMULATION
+def find_nearest(array, value):
+    idx = (np.abs(array - value)).argmin()
+    return idx
+
 def get_dynamical_range(mod):
     '''
     Compute the dynamical range
     '''
-    def find_nearest(array, value):
-        idx = (np.abs(array - value)).argmin()
-        return idx
-    
     delta = np.zeros(len(mod.Trange))
     delta_norm = np.zeros(len(mod.Trange))
     
     for i in range(len(mod.Exc)):
         Amax, Amin = np.max(mod.Exc[i]), np.min(mod.Exc[i])
-        s90 = find_nearest(mod.Exc[i], 0.9*(Amax-Amin))
-        s10 = find_nearest(mod.Exc[i], 0.1*(Amax-Amin))
+        s80 = find_nearest(mod.Exc[i], 0.8*(Amax-Amin) + Amin)
+        s20 = find_nearest(mod.Exc[i], 0.2*(Amax-Amin) + Amin)
         
-        delta[i] = 10*np.log10(mod.stimuli[s90] / mod.stimuli[s10])
+        delta[i] = 10*np.log10(mod.stimuli[s80] / mod.stimuli[s20])
     
         Amax, Amin = np.max(mod.Exc_norm[i]), np.min(mod.Exc_norm[i])
-        s90 = find_nearest(mod.Exc_norm[i], 0.9*(Amax-Amin) )
-        s10 = find_nearest(mod.Exc_norm[i], 0.1*(Amax-Amin))
+        s80 = find_nearest(mod.Exc_norm[i], 0.8*(Amax-Amin) + Amin )
+        s20 = find_nearest(mod.Exc_norm[i], 0.2*(Amax-Amin) + Amin)
         
-        delta_norm[i] = 10*np.log10(mod.stimuli[s90] / mod.stimuli[s10])
+        delta_norm[i] = 10*np.log10(mod.stimuli[s80] / mod.stimuli[s20])
         
     return delta, delta_norm
 
