@@ -3,6 +3,9 @@ import networkx as nx
 
 import matplotlib.pyplot as plt
 
+from matplotlib import cm
+from HTC_utils import find_nearest
+
 class plotHTC:
     
     def __init__(self):
@@ -157,20 +160,84 @@ class plotHTC:
                 plt.ylabel(r'$pdf(s)$', size=13)
 
         plt.show()
+    
+    def plot_pdf(self, mod, xlabel, Nbins=None):
+        cm1 = cm.get_cmap('jet')
+        fact = 8
+        
+        Trange = mod.Trange / mod.Tc / mod.Tmax / np.argmax(mod.S2) * (len(mod.Trange)-1)
+        Trange_norm = mod.Trange / mod.Tc / mod.Tmax / np.argmax(mod.S2_norm) * (len(mod.Trange)-1)
+        
+        if xlabel == 'cluster':
+            pdf, pdf_norm = mod.pdf, mod.pdf_norm
+            xlabel = 'S'
+        elif xlabel == 'ev':
+            pdf, pdf_norm = mod.pdf_ev, mod.pdf_ev_norm
+            xlabel = r'$t_{ev}$'
+        elif xlabel == 'tau':
+            pdf, pdf_norm = mod.pdf_tau, mod.pdf_tau_norm
+            xlabel = r'$tau$'
+        
+        plt.figure(figsize=(20,6))
+        
+        # Pdf
+        plt.subplot(1, 2, 1)
+        plt.xscale('log')
+        plt.yscale('log')
+
+        for i in range(2,8):
+            val = 0.2 * i
+            ind = find_nearest(Trange, val)
+            
+            if Nbins==None:
+                plt.scatter(pdf[ind][0], pdf[ind][1]/np.sum(pdf[ind][1]),
+                            label='T='+str(round(val,1))+'*Tc', alpha=0.8, s=20,
+                            c=[cm1(i/fact)]*len(pdf[ind][0]))
+            else:
+                ist = np.histogram(pdf[ind][0], weights=pdf[ind][1]/np.sum(pdf[ind][1]), bins=Nbins)
+                plt.scatter( (ist[1][1:] + ist[1][:-1])/2, ist[0], label='T='+str(round(val,1))+'*Tc', s=20,
+                            c=[cm1(i/fact)]*len(ist[0]))
+                
+        plt.xlabel(xlabel, fontsize=13)
+        plt.ylabel('pdf', fontsize=13)
+        plt.grid()
+        plt.legend(title='W', fontsize=13)
+        
+        # Pdf norm
+        plt.subplot(1, 2, 2)
+        plt.xscale('log')
+        plt.yscale('log')
+
+        for i in range(2,8):
+            val = 0.2 * i
+            ind = find_nearest(Trange, val)
+        
+            if Nbins==None:
+                plt.scatter(pdf_norm[ind][0], pdf_norm[ind][1]/np.sum(pdf_norm[ind][1]),
+                            label='T='+str(round(val,1))+'*Tc',alpha=0.8, s=20,
+                            c=[cm1(i/fact)]*len(pdf_norm[ind][0]))
+            else:
+                ist = np.histogram(pdf_norm[ind][0], weights=pdf_norm[ind][1]/np.sum(pdf_norm[ind][1]), bins=Nbins)
+                plt.scatter( (ist[1][1:] + ist[1][:-1])/2, ist[0], label='T='+str(round(val,1))+'*Tc', s=20,
+                            c=[cm1(i/fact)]*len(ist[0]))
+        
+        plt.xlabel(xlabel, fontsize=13)
+        plt.ylabel('pdf', fontsize=13)
+        plt.grid()
+        plt.legend(title=r'$W_{norm}$', fontsize=13)
+        plt.show()
         
     def plot_stimulated(self, mod):
-        from matplotlib import cm
-        from HTC_utils import find_nearest
-        
         plt.figure(figsize=(20,6))
 
         Trange = mod.Trange / mod.Tc / mod.Tmax / np.argmax(mod.S2) * (len(mod.Trange)-1)
         Trange_norm = mod.Trange / mod.Tc / mod.Tmax / np.argmax(mod.S2_norm) * (len(mod.Trange)-1)
 
-        cm1 = cm.get_cmap('viridis')
+        #cm1 = cm.get_cmap('viridis')
         #cm1 = cm.get_cmap('gray')
         #cm1 = cm.get_cmap('autumn')
-        fact = 7.5
+        cm1 = cm.get_cmap('jet')
+        fact = 8
 
         # Act vs. stimuli - original network
         plt.subplot(1, 2, 1)
@@ -202,19 +269,18 @@ class plotHTC:
             plt.plot(mod.stimuli, mod.Exc_norm[ind], '-.', lw=2, c=cm1(i/fact), label='T='+str(round(val,1))+'*Tc')
         plt.legend(fontsize=12, title=r'$W_{norm}$')
     
+    
     def plot_dynamical_range(self, mod):
-        from matplotlib import cm
-        from HTC_utils import find_nearest
-
         plt.figure(figsize=(20,6))
 
         Trange = mod.Trange / mod.Tc / mod.Tmax / np.argmax(mod.S2) * (len(mod.Trange)-1)
         Trange_norm = mod.Trange / mod.Tc / mod.Tmax / np.argmax(mod.S2_norm) * (len(mod.Trange)-1)
 
-        cm1 = cm.get_cmap('viridis')
+        #cm1 = cm.get_cmap('viridis')
         #cm1 = cm.get_cmap('gray')
         #cm1 = cm.get_cmap('autumn')
-        fact = 7.5
+        cm1 = cm.get_cmap('jet')
+        fact = 8
 
         # Act vs. stimuli - original network
         plt.subplot(1, 3, 1)
@@ -262,6 +328,7 @@ class plotHTC:
         plt.legend(fontsize=12)
 
         plt.show()
+    
     
     def draw_network(self, model):
         G = nx.from_numpy_matrix(model.W)
