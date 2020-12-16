@@ -210,17 +210,35 @@ def get_dynamical_range(mod):
     delta_norm = np.zeros(len(mod.Trange))
     
     for i in range(len(mod.Exc)):
+        # Original matrix
+        
+        # Get A90 and A10
         Amax, Amin = np.max(mod.Exc[i]), np.min(mod.Exc[i])
-        s80 = find_nearest(mod.Exc[i], 0.8*(Amax-Amin) + Amin)
-        s20 = find_nearest(mod.Exc[i], 0.2*(Amax-Amin) + Amin)
+        A10, A90 = (Amax-Amin)*0.1 + Amin, (Amax-Amin)*0.9 + Amin
+        # Get corresponent index
+        s10 = np.where( (A10 > mod.Exc[i][:-1])*(A10 < mod.Exc[i][1:]) )[0][-1]
+        s90 = np.where( (A90 > mod.Exc[i][:-1])*(A90 < mod.Exc[i][1:]) )[0][0]
+        # Get the s value by linear interpolation
+        s10 = (mod.stimuli[s10]-mod.stimuli[s10+1]) / (mod.Exc[i][s10]-mod.Exc[i][s10+1]) * (A10 - mod.Exc[i][s10+1]) + mod.stimuli[s10+1]
+        s90 = (mod.stimuli[s90]-mod.stimuli[s90+1]) / (mod.Exc[i][s90]-mod.Exc[i][s90+1]) * (A90 - mod.Exc[i][s90+1]) + mod.stimuli[s90+1]
         
-        delta[i] = 10*np.log10(mod.stimuli[s80] / mod.stimuli[s20])
+        # Dynamical range
+        delta[i] = 10*np.log10(s90 / s10)
     
-        Amax, Amin = np.max(mod.Exc_norm[i]), np.min(mod.Exc_norm[i])
-        s80 = find_nearest(mod.Exc_norm[i], 0.8*(Amax-Amin) + Amin )
-        s20 = find_nearest(mod.Exc_norm[i], 0.2*(Amax-Amin) + Amin)
+        # Original matrix
         
-        delta_norm[i] = 10*np.log10(mod.stimuli[s80] / mod.stimuli[s20])
+        # Get A90 and A10
+        Amax, Amin = np.max(mod.Exc_norm[i]), np.min(mod.Exc_norm[i])
+        A10, A90 = (Amax-Amin)*0.1 + Amin, (Amax-Amin)*0.9 + Amin
+        # Get corresponent index
+        s10 = np.where( (A10 > mod.Exc_norm[i][:-1])*(A10 < mod.Exc_norm[i][1:]) )[0][-1]
+        s90 = np.where( (A90 > mod.Exc_norm[i][:-1])*(A90 < mod.Exc_norm[i][1:]) )[0][0]
+        # Get the s value by linear interpolation
+        s10 = (mod.stimuli[s10]-mod.stimuli[s10+1]) / (mod.Exc_norm[i][s10]-mod.Exc_norm[i][s10+1]) * (A10 - mod.Exc_norm[i][s10+1]) + mod.stimuli[s10+1]
+        s90 = (mod.stimuli[s90]-mod.stimuli[s90+1]) / (mod.Exc_norm[i][s90]-mod.Exc_norm[i][s90+1]) * (A90 - mod.Exc_norm[i][s90+1]) + mod.stimuli[s90+1]
+        
+        # Dynamical range
+        delta_norm[i] = 10*np.log10(s90 / s10)
         
     return delta, delta_norm
 
