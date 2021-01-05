@@ -2,6 +2,8 @@ import numpy as np
 from scipy.signal import periodogram
 import igraph as gf
 from collections import Counter
+from scipy.interpolate import InterpolatedUnivariateSpline
+
 
 # GENERAL FUNCTION
 def power_law(a, b, g, size):
@@ -17,6 +19,15 @@ def power_law(a, b, g, size):
 def normalize(W):
     ''' Normalize each entry in a matrix by the sum of its row'''
     return W / np.sum(W, axis=1)[:,None]
+
+
+def hline_intersection(x1, y1, x2, y2, y_star):
+    '''
+    Get intersection btw lines through two points and hline
+    '''
+    if np.sum((y1-y2)==0)>0:
+        print('hline_intersection: the y\'s are equal')
+    return (x1 - x2) / (y1 - y2) * (y_star - y2) + x2
 
 
 # PDF/POWER SPECTRUM IO HANDLING
@@ -123,17 +134,18 @@ def stimulated_activity(W, runs, steps, r1, r2):
     return np.mean(At)
     
     
-def correlation(mat):
+def susceptibility(mat):
     '''
-    Return the (mean and std) correlation btw N time series.
+    Return the (mean and std) susceptibility btw N time series.
+    Susceptibility = mean covariance btw elements.
     mat -> MxN matrix where:
     - M is the legth of each time series
     - N is the number of different time series
     '''    
     N = mat.shape[1]
     
-    Cij = np.corrcoef(mat, rowvar=False)        # compute NxN correlation matrix
-    Cij = Cij[np.triu_indices(N, k=1)]          # get only upper-triangular values
+    Cij = np.cov(mat, rowvar=False)        # compute NxN covariance matrix
+    Cij = Cij[np.triu_indices(N, k=1)]     # get only upper-triangular values
 
     return ( np.mean(Cij), np.std(Cij) )
 
@@ -197,6 +209,61 @@ def interevent(data):
     return np.mean(dt), np.std(dt), Counter(dt)
 
 
+def get_intersection(arr, y_star):
+    '''
+    Get all the intersection btw array and a hline
+    '''
+    # Increase intersection
+    start = np.where( (arr[:-1]<y_star) * (y_star<arr[1:]) )[0]
+    # Decrease intersection
+    stop = np.where( (arr[:-1]>y_star) * (y_star>arr[1:]) )[0]
+
+    # Check that first start is smaller than first stop
+    if start[0]>stop[0]:
+        stop = np.delete(stop, 0)
+    # Check that last stop is bigger than last start
+    if stop[-1]<start[-1]:
+        start = np.delete(start, -1)
+    
+    # Get intersection with hline
+    start = hline_intersection(start, arr[start], start+1, arr[start+1], y_star)
+    stop = hline_intersection(stop, arr[stop], stop+1, arr[stop+1], y_star)
+    
+    return start, stop
+
+def get_avalanches(arr, y_star):
+    '''
+    Get sizes and lifetimes of avalanches
+    '''
+    T = len(arr)
+    t = np.arange(T)
+    
+    # Get start and stop of avalanches
+    start, stop = get_intersection(arr, y_star)
+    
+    # Compute avalanche time
+    dt = stop - start
+    
+    # Compute avalanche size as activity area
+    I = np.zeros(len(start))
+    
+    for i in range(len(start)):
+        # Get point btw each start and stop
+        t_in = t[(t>start[i])*(t<stop[i])]
+        y_in = arr[t_in]
+    
+        # Append start and stop
+        t_in = np.hstack([start[i], t_in, stop[i]])
+        y_in = np.hstack([y_star, y_in, y_star])
+        
+        # Get spline
+        f = InterpolatedUnivariateSpline(t_in, y_in, k=1)
+    
+        # Integrate
+        I[i] = f.integral(start[i], stop[i])
+        
+    return I, dt
+
 # ANALYSIS POST-SIMULATION
 def find_nearest(array, value):
     idx = (np.abs(array - value)).argmin()
@@ -214,7 +281,7 @@ def get_dynamical_range(mod):
         
         # Get A90 and A10
         Amax, Amin = np.max(mod.Exc[i]), np.min(mod.Exc[i])
-        A10, A90 = (Amax-Amin)*0.2 + Amin, (Amax-Amin)*0.8 + Amin
+        A10, A90 = (Amax-Amin)*0.15 + Amin, (Amax-Amin)*0.85 + Amin
         # Get corresponent index
         s10 = np.where( (A10 > mod.Exc[i][:-1])*(A10 < mod.Exc[i][1:]) )[0][-1]
         s90 = np.where( (A90 > mod.Exc[i][:-1])*(A90 < mod.Exc[i][1:]) )[0][0]
@@ -229,7 +296,7 @@ def get_dynamical_range(mod):
         
         # Get A90 and A10
         Amax, Amin = np.max(mod.Exc_norm[i]), np.min(mod.Exc_norm[i])
-        A10, A90 = (Amax-Amin)*0.2 + Amin, (Amax-Amin)*0.8 + Amin
+        A10, A90 = (Amax-Amin)*0.15 + Amin, (Amax-Amin)*0.85 + Amin
         # Get corresponent index
         s10 = np.where( (A10 > mod.Exc_norm[i][:-1])*(A10 < mod.Exc_norm[i][1:]) )[0][-1]
         s90 = np.where( (A90 > mod.Exc_norm[i][:-1])*(A90 < mod.Exc_norm[i][1:]) )[0][0]

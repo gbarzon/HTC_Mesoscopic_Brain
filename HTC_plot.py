@@ -316,10 +316,13 @@ class plotHTC:
         from HTC_utils import get_dynamical_range
         delta, delta_norm = get_dynamical_range(mod)
 
+        
+        Trange = mod.Trange / mod.Tc / mod.Tmax / np.argmax(mod.S2) * (len(mod.Trange)-1)
+        Trange_norm = mod.Trange / mod.Tc / mod.Tmax / np.argmax(mod.S2_norm) * (len(mod.Trange)-1)
         plt.subplot(1, 3, 3)
-        plt.scatter(mod.Trange/mod.Tc, delta, c='k', s=18, alpha=0.6, label=r'$W$')
+        plt.scatter(Trange, delta, c='k', s=18, alpha=0.6, label=r'$W$')
         #plt.plot(mod.Trange/mod.Tc, delta, c='k')
-        plt.scatter(mod.Trange/mod.Tc, delta_norm, c='r', s=18, alpha=0.5, label=r'$W_{norm}$')
+        plt.scatter(Trange_norm, delta_norm, c='r', s=18, alpha=0.5, label=r'$W_{norm}$')
         #plt.plot(mod.Trange/mod.Tc, delta_norm, c='r')
 
         plt.xlabel(r'$T/T_c$', size=13)
