@@ -275,9 +275,7 @@ class HTC:
         
         # define empty matrix to store results
         A, sigma_A = [np.zeros(len(Trange)) for _ in range(2)]
-        Chi, sigma_Chi = [np.zeros(len(Trange)) for _ in range(2)]
-        ent, sigma_ent = [np.zeros(len(Trange)) for _ in range(2)]
-        ev, sigma_ev = [np.zeros(len(Trange)) for _ in range(2)]
+        Fisher = np.zeros(len(Trange))
         
         pdf_ev = [Counter() for _ in range(len(Trange))]
         pdf_size = []
@@ -314,8 +312,8 @@ class HTC:
             Aij = np.zeros((runs, steps, self.N))
 
             if cluster:
-                S1t = np.zeros((runs, N_cluster))
-                S2t = np.zeros((runs, N_cluster))
+                S1t = np.zeros(N_cluster)
+                S2t = np.zeros(N_cluster)
 
             # LOOP OVER TIME STEPS
             for t in ( tqdm(range(steps)) if self.verbose else range(steps)):
@@ -326,32 +324,27 @@ class HTC:
                 # COMPUTE CLUSTERS
                 if cluster and (not t%dt_cluster):
                     tempT = t//dt_cluster
-                    for j in range(runs):
-                        S1t[j,tempT], S2t[j,tempT], tmp_counts = compute_clusters(W, s[j])
-                        pdf[i] += tmp_counts
+                    S1t[tempT], S2t[tempT], tmp_counts = compute_clusters(W, s) 
+                    pdf[i] += Counter(tmp_counts)
             # END LOOP OVER TIME
             
             # clear tmp variables
             del S, s
             
             # COMPUTE AVERAGES
-            # activity
+            # Activity
             if self.verbose: print('Computing activity...')
             At = np.mean(Aij, axis=2)    # node average <A(t)>
             A[i], sigma_A[i] = np.mean(At), np.mean( np.std(At, axis=1) )
             act[i] = At[0]
             
-            # susceptibility
+            # Fisher information
             if self.verbose: print('Computing susceptibility...')
-            tmpCij = np.array(list(map(susceptibility, Aij)))
-            Chi[i], sigma_Chi[i] = np.mean(tmpCij[:,0]), np.mean(tmpCij[:,1])
+            Fisher[i] = fisher_information(Aij)
             
-            # inter-event time
+            # Inter-event time
             if self.verbose: print('Computing interevent time...')
-            tmpEv = np.array(list(map(interevent, Aij)))
-            tmpEv_mean, tmpEv_sigma, tmpEv_pdf = tmpEv[:,0], tmpEv[:,1], tmpEv[:,2]
-            ev[i], sigma_ev[i] = np.mean(tmpEv_mean), np.mean(tmpEv_sigma)
-            pdf_ev[i] = np.sum(tmpEv_pdf)
+            pdf_ev[i] = Counter(interevent(Aij))
             
             # power spectrum
             if self.verbose: print('Computing power spectrum...')
@@ -363,34 +356,15 @@ class HTC:
                 S2[i] = np.mean(S2t)
             # END COMPUTE AVERAGES
             
-            
             # COMPUTE AVALANCHES
             if self.verbose: print('Computing avalanches...')
-            av_size, av_time = [], []
-            for i in ( tqdm(range(runs)) if self.verbose else range(runs) ):
-                tmp_size, tmp_time = get_avalanches(At[i], np.mean(At[i]) + np.std(At[i]))
-                av_size.append(tmp_size)
-                av_time.append(tmp_time)
-            # Reshape
-            av_size = np.hstack(av_size)
-            av_time = np.hstack(av_time)
-            
-            # Get histograms to compress data
-            Nbins = 50
-            hist_size = np.histogram(av_size, bins = Nbins, density = True)
-            hist_time = np.histogram(av_time, bins = Nbins, density = True)
-            del av_size, av_time
-            
-            # Convert bin edges to bin center
-            hist_size = np.array( [ (hist_size[1][1:] + hist_size[1][:-1])/2, hist_size[0] ] )
-            hist_time = np.array( [ (hist_time[1][1:] + hist_time[1][:-1])/2, hist_time[0] ] )
-            
+            hist_size, hist_time = avalanches(At)
             pdf_size.append( hist_size )
             pdf_time.append( hist_time )
             # END COMPUTE AVALANCHES
                 
             # clear tmp variables
-            del Aij, At, tmpEv_mean, tmpEv_sigma, tmpEv_pdf, hist_size, hist_time
+            del Aij, At, hist_size, hist_time
             if cluster:
                 del S1t, S2t
             
