@@ -393,6 +393,53 @@ def avalanches(data, threshold=1., Nbins=50):
     return hist_size, hist_time
 
 
+# ---------- CAUSAL AVALANCHES ----------
+
+@jit(nopython=True)
+def getCausalAval(aval):
+    '''
+    Return the time series of each avalanche for a single run
+    '''
+    steps, N = aval.shape
+    names = np.unique(aval)                 # get the code of each avalanche
+    names = np.delete(names, 0)             # remove elements 0 i.e. not active
+    
+    series = np.zeros((len(names), steps))  # init time series of each avalanche
+    
+    for step in prange(steps):
+        now_active = np.unique(aval[step])  # get code of aval active at time t
+        now_active = np.delete(now_active, 0) # remove elements 0 i.e. not active
+        
+        for code in now_active:
+            count = np.count_nonzero(aval[step]==code) # count aval size
+            index = np.where(names == code)[0]         # get aval name index
+            series[index, step] = count
+    
+    return series / N
+
+
+@jit(nopython=True)
+def getCausalAvalPdf(aval):
+    '''
+    Return size and time pdf of causal avalanches.
+    '''
+    steps, runs, N = aval.shape
+    
+    sizes = []
+    times = []
+    
+    # Loop over runs
+    for i in prange(runs):
+        series = getCausalAval(aval[:,i])    # get time series of avalanches
+        # Loop over avals
+        for j in range(len(series)):
+            sizes.append(series[j].sum())    # size as integral of single avalanche
+            ts = np.where(series[j]>0)[0]    # get times where avalanche is active
+            times.append(ts[-1]-ts[0])
+            
+    return sizes, times
+
+
 # ---------- ANALYSIS POST-SIMULATION ----------
 def find_nearest(array, value):
     idx = (np.abs(array - value)).argmin()
