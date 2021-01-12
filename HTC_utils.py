@@ -1,5 +1,6 @@
 import numpy as np
 from numba import jit, prange
+from numba.typed import List
 from scipy.signal import periodogram
 import igraph as gf
 from collections import Counter
@@ -86,37 +87,58 @@ def init_state(N, runs, fract):
     
     
 @jit(nopython=True)
-def update_state_single(S, W, T, r1, r2, aval=None):
+def update_state_single(S, W, T, r1, r2, aval, step, avalOn):
     '''
     Update state of the system according to HTC model
+    Update causal avalanches state
     '''
-        
-    probs = np.random.random(len(S))                 # generate probabilities
-    s = (S==1).astype(np.float64)                    # get active nodes
-    pA = ( r1 + (1.-r1) * ( (W@s)>T ) )              # prob. to become active
+    N = len(S)
+    probs = np.random.random(N)                 # generate probabilities
+    s = (S==1).astype(np.float64)               # get active nodes
+    pA = ( r1 + (1.-r1) * ( (W@s)>T ) )         # prob. to become active
 
     # update state vector
-    newS = ( (S==0)*(probs<pA)                       # I->A
-         + (S==1)*-1                                 # A->R
-         + (S==-1)*(probs>r2)*-1 )                   # R->I (remain R with prob 1-r2)
+    newS = ( (S==0)*(probs<pA)                  # I->A
+         + (S==1)*-1                            # A->R
+         + (S==-1)*(probs>r2)*-1 )              # R->I (remain R with prob 1-r2)
+    
+    # Causal avalanches
+    newAval = np.zeros(N)
+    if avalOn:        
+        p_single_neuron = W*s / (W@s).reshape(-1,1) * (1.-r1)  # prob of single neuron to be activated
         
-    return newS
+        # Loop over nodes
+        for node in prange(N):
+            # Check if new activation
+            if newS[node] == 1:
+                p_cum = np.cumsum(p_single_neuron[node])    # cumsum
+                causal = np.where(p_cum>probs[node])[0]
+                
+                if len(causal)>0:
+                    # Activated by another neuron
+                    newAval[node] = aval[causal[0]]
+                else:
+                    # Self-activation
+                    newAval[node] = 10 +  step*N + node
 
-@jit(nopython=True, parallel=True)
-def update_state(S, W, T, r1, r2, aval=None):
+    return newS, newAval
+
+@jit(nopython=True)
+def update_state(S, W, T, r1, r2, aval, step, avalOn=True):
     '''
     Update state of each runs
     '''
-    
     runs = S.shape[0]
-    newS = np.zeros((S.shape[0], S.shape[1]))
+    newS = np.zeros((S.shape[0], S.shape[1]), dtype=np.float64)
+    newAval = np.zeros((S.shape[0], S.shape[1]), dtype=np.int32)
     
-    # Loop over runs
+    # Simulation step in parallel
     for i in prange(runs):
-        tmpS = update_state_single(S[i], W, T, r1, r2, aval=None)
-        newS[i] = tmpS
+        tmpS = update_state_single(S[i], W, T, r1, r2, aval[i], step, avalOn)
+        newS[i] = tmpS[0]
+        newAval[i] = tmpS[1]
         
-    return (newS, (newS==1).astype(np.int64))
+    return (newS, (newS==1).astype(np.int64), newAval)
 
 @jit(nopython=True)
 def stimulated_activity(W, runs, steps, r1, r2):
@@ -154,7 +176,7 @@ def fisher_information(mat):
         # compute NxN covariance matrix
         Cij = np.cov(mat[i], rowvar=False)
         # get only upper-triangular values
-        mask = np.triu( np.ones((N,N)), k=1)
+        mask = np.triu( np.ones((N,N)), k=1 )
         Cij = (Cij * mask).flatten()
         Cij = Cij[Cij != 0]
         
@@ -223,51 +245,60 @@ def interevent(data):
 
 
 # ---------- CLUSTER ANALYSIS ----------
-
 @jit(nopython=True)
-def myCount(cluster):
+def DFSUtil(mask, temp, node, visited):
     '''
-    Count the occurrence of unique labels
+    Depth-first search
     '''
-    # Get unique labels
-    keys = np.unique(cluster)
-    N = len(keys)
-    sizes = np.zeros(N)
+    N = mask.shape[0]
     
-    # Count label occurrences
-    for i in prange(N):
-        sizes[i] = np.count_nonzero(cluster==keys[i])
-        
-    return -np.sort(-sizes)
-
+    # Mark the current vertex as visited
+    visited[node] = True
+ 
+    # Store the vertex to list
+    temp.append(node)
+ 
+    # Get nearest neighbours
+    nn = List()
+    nn.append(0)
+    nn.remove(0)
+    for n in range(N):
+        if (not node == n) and mask[node, n]>0:
+            nn.append(n)
+                
+    # Repeat for all nn
+    for i in nn:
+        if visited[i] == False:
+            # Update the list
+            temp = DFSUtil(mask, temp, i, visited)
+    return temp
 
 @jit(nopython=True)
 def myConnectedComponents(W, s):
     '''
-    Get the size of the connected components
+    Method to retrieve connected components
+    in an undirected graph
     '''
     N = W.shape[0]
     
     # mask adjacency matrix with active nodes
     mask = (W * s).T * s
-    
-    # Init all nodes belongs to fake cluster
-    cluster = np.zeros(N)-1
-    
-    # Loop over nodes
-    for i in range(N):
-        # If not already assigned, create new cluster
-        if cluster[i] == -1:
-            cluster[i] = i
-        for j in range(i+1,N):
-            if cluster[j] == -1 and mask[i,j]>0:
-                cluster[j] = cluster[i]
-                
-    # Return occurences
-    return myCount(cluster)
 
+    visited = np.zeros(N, dtype=np.bool_)
+    cc = np.zeros(N)
+    
+    for v in range(N):
+        if visited[v] == False:
+            temp = List()
+            temp.append(0)
+            temp.remove(0)
+            
+            clust = DFSUtil(mask, temp, v, visited)
+            cc[v] = len(clust)
+    
+    return -np.sort(-cc)
 
-@jit(nopython=True, parallel=False)
+@jit(nopython=True)
 def compute_clusters(W, s):
     '''
     Cluster size analysis for each run
@@ -364,7 +395,7 @@ def get_avalanches(arr, y_star):
 
 
 @jit(nopython=True)
-def avalanches(data, threshold=1., Nbins=50):
+def get_avalanches_pdf(data, threshold=1., Nbins=50):
     '''
     Return avalanches histogram from series of runs.
     '''
@@ -394,9 +425,8 @@ def avalanches(data, threshold=1., Nbins=50):
 
 
 # ---------- CAUSAL AVALANCHES ----------
-
 @jit(nopython=True)
-def getCausalAval(aval):
+def get_causal_avalanches(aval):
     '''
     Return the time series of each avalanche for a single run
     '''
@@ -419,25 +449,64 @@ def getCausalAval(aval):
 
 
 @jit(nopython=True)
-def getCausalAvalPdf(aval):
+def get_causal_avalanches_pdf(aval, Nbins=50):
     '''
     Return size and time pdf of causal avalanches.
     '''
     steps, runs, N = aval.shape
     
-    sizes = []
-    times = []
+    sizes = np.array([0.0])
+    times = np.array([0])
     
     # Loop over runs
     for i in prange(runs):
-        series = getCausalAval(aval[:,i])    # get time series of avalanches
+        series = get_causal_avalanches(aval[:,i])    # get time series of avalanches
         # Loop over avals
         for j in range(len(series)):
-            sizes.append(series[j].sum())    # size as integral of single avalanche
+            size = np.array(series[j].sum()).reshape(1)
+            sizes = np.hstack(( sizes, size ))    # size as integral of single avalanche
             ts = np.where(series[j]>0)[0]    # get times where avalanche is active
-            times.append(ts[-1]-ts[0])
+            ts = np.array(ts[-1]-ts[0]).reshape(1)
+            times = np.hstack((times, ts))
+    
+    # Remove fake 0 as first element
+    sizes = np.delete(sizes, 0)
+    times = np.delete(times, 0)
+    
+    # Get histograms to compress data
+    hist_size = np.histogram(sizes, bins = Nbins)
+    hist_time = np.histogram(times, bins = Nbins)
             
-    return sizes, times
+    # Convert bin edges to bin center
+    hist_size = np.vstack( ( (hist_size[1][1:] + hist_size[1][:-1])/2, hist_size[0] ) )
+    hist_time = np.vstack( ( (hist_time[1][1:] + hist_time[1][:-1])/2, hist_time[0] ) )
+    
+    return hist_size, hist_time
+
+
+# ---------- DYNAMICAL RANGE ----------
+
+@jit(nopython=True)
+def stimulated(stimuli, N, W, T, r2, runs, fract, steps):
+    Exc = np.zeros(len(stimuli))
+                    
+    # Loop over stimuli
+    for i in range(len(stimuli)):         
+        S = init_state(N, runs, fract)
+        At = np.zeros(steps)
+        fake_aval = np.zeros((runs, N))
+                
+        # Loop over time steps
+        for t in range(steps//10):
+            # update state vector
+            S, s, _ = update_state(S, W, T, stimuli[i], r2, fake_aval, t, avalOn=False)
+            # compute average activity
+            At[t] = np.mean(s)
+        # end loop over time steps
+        Exc[i] = np.mean(At)
+     # End loop over stimuli
+    
+    return Exc
 
 
 # ---------- ANALYSIS POST-SIMULATION ----------

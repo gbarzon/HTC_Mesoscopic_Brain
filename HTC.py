@@ -82,12 +82,24 @@ class HTC:
             del act
         
         # Load power spectrum
-        spectr = np.loadtxt(filename+delimiter+str('spectrum.txt'))
-        tmp.spectr, tmp.spectr_norm = spectr[:len(spectr)//2], spectr[len(spectr)//2:]
-        del spectr
+        if Path(filename+delimiter+str('spectrum.txt')).is_file():
+            spectr = np.loadtxt(filename+delimiter+str('spectrum.txt'))
+            tmp.spectr, tmp.spectr_norm = spectr[:len(spectr)//2], spectr[len(spectr)//2:]
+            del spectr
         
         # Load pdfs
-        tmp.pdf_ev, tmp.pdf_ev_norm = read_lists(filename+delimiter+'pdf_ev.txt')
+        if Path(filename+delimiter+str('pdf.txt')).is_file():
+            tmp.pdf, tmp.pdf_norm = read_lists(filename+delimiter+str('pdf.txt'))
+        if Path(filename+delimiter+str('pdf_ev.txt')).is_file():
+            tmp.pdf_ev, tmp.pdf_ev_norm = read_lists(filename+delimiter+'pdf_ev.txt')
+        if Path(filename+delimiter+str('pdf_size.txt')).is_file():
+            tmp.pdf_ev, tmp.pdf_ev_norm = read_lists(filename+delimiter+'pdf_size.txt')
+        if Path(filename+delimiter+str('pdf_time.txt')).is_file():
+            tmp.pdf_ev, tmp.pdf_ev_norm = read_lists(filename+delimiter+'pdf_time.txt')
+        if Path(filename+delimiter+str('pdf_size_causal.txt')).is_file():
+            tmp.pdf_ev, tmp.pdf_ev_norm = read_lists(filename+delimiter+'pdf_size_causal.txt')
+        if Path(filename+delimiter+str('pdf_time_causal.txt')).is_file():
+            tmp.pdf_ev, tmp.pdf_ev_norm = read_lists(filename+delimiter+'pdf_time_causal.txt')
         
         # Load stimulated activity (if present)
         if Path(filename+delimiter+str('stimulated.txt')).is_file():
@@ -99,21 +111,8 @@ class HTC:
         obs = np.loadtxt(filename+delimiter+str('observables.txt'))
         
         # Load observables
-        if len(obs)==16:
-            tmp.A, tmp.sigmaA, tmp.C, tmp.sigmaC,\
-            tmp.Ev, tmp.sigmaEv, tmp.S1, tmp.S2,\
-            tmp.A_norm, tmp.sigmaA_norm, tmp.C_norm, tmp.sigmaC_norm,\
-            tmp.Ev_norm, tmp.sigmaEv_norm, tmp.S1_norm, tmp.S2_norm = obs
-            
-            # Unpack cluster distribution
-            tmp.pdf, tmp.pdf_norm = read_lists(filename+delimiter+str('pdf.txt'))
-            
-        else:
-            tmp.A, tmp.sigmaA, tmp.C, tmp.sigmaC,\
-            tmp.Ev, tmp.sigmaEv,\
-            tmp.A_norm, tmp.sigmaA_norm, tmp.C_norm, tmp.sigmaC_norm,\
-            tmp.Ev_norm, tmp.sigmaEv_norm \
-            = obs
+        tmp.A, tmp.sigmaA, tmp.Fisher, tmp.S1, tmp.S2, \
+        tmp.A_norm, tmp.sigmaA_norm, tmp.Fisher_norm, tmp.S1_norm, tmp.S2_norm = obs
         
         return tmp
     
@@ -226,45 +225,34 @@ class HTC:
         self.name += delimiter + str(self.W_mean) + delimiter + str(self.Id)
     
     
-    def simulate(self, results_folder, cluster=False, dinamical=False, steps=6000, runs=100, N_cluster=3000):
+    def simulate(self, results_folder,
+                 cluster=True, dinamical=True, complete_simulation=True,
+                 steps=6000, runs=100):
         '''
         Run simulation for both original and normalized matrices
         '''
         print('Start simulation for '+str(self.name))
-                
-        if cluster:
-            self.A, self.sigmaA, self.Chi, self.sigmaChi, self.Ev, self.sigmaEv,\
-            self.spectr, self.act, self.pdf_ev, self.Exc, \
-            self.pdf_size, self.pdf_time, \
-            self.S1, self.S2, self.pdf = \
-            self.run_model(self.W, cluster, dinamical, steps, runs, N_cluster)
+        
+        self.A, self.sigmaA, self.Fisher, self.spectr, self.act, self.pdf_ev, self.Exc, \
+        self.pdf_size, self.pdf_time, self.pdf_size_causal, self.pdf_time_causal, \
+        self.S1, self.S2, self.pdf = \
+        self.run_model(self.W, cluster, dinamical, complete_simulation, steps, runs)
             
-            self.A_norm, self.sigmaA_norm, self.Chi_norm, self.sigmaChi_norm,\
-            self.Ev_norm, self.sigmaEv_norm, self.spectr_norm, self.act_norm, self.pdf_ev_norm, self.Exc_norm, \
-            self.pdf_size_norm, self.pdf_time_norm, \
-            self.S1_norm, self.S2_norm, self.pdf_norm = \
-            self.run_model(normalize(self.W), cluster, dinamical, steps, runs, N_cluster)
-        else:
-            self.A, self.sigmaA, self.Chi, self.sigmaChi, self.Ev, self.sigmaEv,\
-            self.spectr, self.act, self.pdf_ev, self.Exc, \
-            self.pdf_size, self.pdf_time = self.run_model(self.W, cluster, dinamical, steps, runs, N_cluster)
-            
-            self.A_norm, self.sigmaA_norm, self.Chi_norm, self.sigmaChi_norm, self.Ev_norm, self.sigmaEv_norm,\
-            self.spectr_norm, self.act_norm, self.pdf_ev_norm, self.Exc_norm, \
-            self.pdf_size_norm, self.pdf_time_norm = \
-            self.run_model(normalize(self.W), cluster, dinamical, steps, runs, N_cluster)
+        self.A_norm, self.sigmaA_norm, self.Fisher_norm, self.spectr_norm, self.act_norm, self.pdf_ev_norm, self.Exc_norm, \
+        self.pdf_size_norm, self.pdf_time_norm, self.pdf_size_causal_norm, self.pdf_time_causal_norm, \
+        self.S1_norm, self.S2_norm, self.pdf_norm = \
+        self.run_model(normalize(self.W), cluster, dinamical, complete_simulation, steps, runs)
         
         print('End simulation for '+str(self.name))
         # Save results
-        self.save(results_folder, cluster, dinamical)
+        self.save(results_folder, cluster, dinamical, complete_simulation)
     
-    def run_model(self, W, cluster, dinamical, steps, runs, N_cluster, fract=0.1):
+    
+    def run_model(self, W, cluster, dinamical, complete_simulation, steps, runs, fract=0.1):
         '''
         HTC model
         '''
-        
-        dt_cluster = int(steps/N_cluster)
-        
+                
         # treshold interval
         if np.mean(np.sum(W, axis=1)) == 1:
             W_mean = 1
@@ -280,15 +268,16 @@ class HTC:
         pdf_ev = [Counter() for _ in range(len(Trange))]
         pdf_size = []
         pdf_time = []
+        pdf_size_causal = []
+        pdf_time_causal = []
         
         spectr = []
         act = np.zeros((len(Trange), steps))
         
         Exc = np.zeros((len(Trange),len(self.stimuli)))
         
-        if cluster:
-            S1, S2 = [np.zeros(len(Trange)) for _ in range(2)]
-            pdf = [Counter() for _ in range(len(Trange))]
+        S1, S2 = [np.zeros(len(Trange)) for _ in range(2)]
+        pdf = [Counter() for _ in range(len(Trange))]
 
         if self.verbose:
             print(self.title)
@@ -306,30 +295,34 @@ class HTC:
                 print('Simulating activity...')
 
             # MODEL INITIALIZATION
-            S = init_state(self.N, runs, fract)
-
             # create empty array to store activity and cluster size over time
             Aij = np.zeros((runs, steps, self.N))
+            aval_ij = np.zeros((steps, runs, self.N))
+            
+            # init activity and avalanches
+            S = init_state(self.N, runs, fract)
+            aval = (S==1) * np.arange(1,self.N+1)
+            aval = aval.astype(np.int32)
 
             if cluster:
-                S1t = np.zeros(N_cluster)
-                S2t = np.zeros(N_cluster)
+                S1t = np.zeros(steps)
+                S2t = np.zeros(steps)
 
             # LOOP OVER TIME STEPS
             for t in ( tqdm(range(steps)) if self.verbose else range(steps)):
                 # UPDATE STATE VECTOR
-                S, s = update_state(S, W, T, self.r1, self.r2)
-                Aij[:,t,:] = s
+                S, s, aval = update_state(S, W, T, self.r1, self.r2, aval, t, avalOn=True)
+                Aij[:,t] = s
+                aval_ij[t] = aval
 
                 # COMPUTE CLUSTERS
-                if cluster and (not t%dt_cluster):
-                    tempT = t//dt_cluster
-                    S1t[tempT], S2t[tempT], tmp_counts = compute_clusters(W, s) 
+                if cluster:
+                    S1t[t], S2t[t], tmp_counts = compute_clusters(W, s)
                     pdf[i] += Counter(tmp_counts)
-            # END LOOP OVER TIME
-            
+                 
             # clear tmp variables
-            del S, s
+            del S, s, aval
+            # END LOOP OVER TIME
             
             # COMPUTE AVERAGES
             # Activity
@@ -338,57 +331,54 @@ class HTC:
             A[i], sigma_A[i] = np.mean(At), np.mean( np.std(At, axis=1) )
             act[i] = At[0]
             
-            # Fisher information
-            if self.verbose: print('Computing susceptibility...')
-            Fisher[i] = fisher_information(Aij)
-            
-            # Inter-event time
-            if self.verbose: print('Computing interevent time...')
-            pdf_ev[i] = Counter(interevent(Aij))
-            
-            # power spectrum
-            if self.verbose: print('Computing power spectrum...')
-            spectr.append(avg_pow_spec(At))
-            
             # cluster
             if cluster:
                 S1[i] = np.mean(S1t)
                 S2[i] = np.mean(S2t)
+                
+                del S1t, S2t
             # END COMPUTE AVERAGES
             
-            # COMPUTE AVALANCHES
-            if self.verbose: print('Computing avalanches...')
-            hist_size, hist_time = avalanches(At)
-            pdf_size.append( hist_size )
-            pdf_time.append( hist_time )
-            # END COMPUTE AVALANCHES
-                
-            # clear tmp variables
-            del Aij, At, hist_size, hist_time
-            if cluster:
-                del S1t, S2t
+            if complete_simulation:
+                # FISHER INFORMATION
+                if self.verbose: print('Computing Fisher information...')
+                Fisher[i] = fisher_information(Aij)
+            
+                # INTER-EVENT TIME
+                if self.verbose: print('Computing interevent time...')
+                pdf_ev[i] = Counter(interevent(Aij))
+            
+                del Aij
+            
+                # POWER SPECTRUM
+                if self.verbose: print('Computing power spectrum...')
+                spectr.append(avg_pow_spec(At))
+            
+                # COMPUTE AVALANCHES
+                if self.verbose: print('Computing avalanches...')
+                hist_size, hist_time = get_avalanches_pdf(At)
+                pdf_size.append( hist_size )
+                pdf_time.append( hist_time )
+            
+                del At
+                # END COMPUTE AVALANCHES
+            
+                # COMPUTE CAUSAL AVALANCHES
+                if self.verbose: print('Computing causal avalanches...')
+                runs_to_analyze = runs // 2
+                if runs_to_analyze == 0:
+                    runs_to_analyze = 1
+                hist_size, hist_time = get_causal_avalanches_pdf(aval_ij[:,:runs_to_analyze])
+                pdf_size_causal.append( hist_size )
+                pdf_time_causal.append( hist_time )
+                del hist_size, hist_time, aval_ij   # clear tmp variables
+                # END COMPUTE CAUSAL AVALANCHES
             
             # DYNAMICAL RANGE
             if dinamical:
                 if self.verbose: print('\nSimulating dynamical range...')
-            
-                # Loop over rates
-                for j in ( tqdm(range(len(self.stimuli))) if self.verbose else range(len(self.stimuli)) ):                
-                    S = init_state(self.N, runs, fract)
-                    At = np.zeros((runs, steps//10))
                 
-                    # Loop over time steps
-                    for t in range(steps//10):
-                        # update state vector
-                        S, s = update_state(S, W, T, r1=self.stimuli[j], r2=self.r2)
-                        # compute average activity
-                        At[:,t] = np.mean(s, axis=1)
-                    # end loop over time steps
-                    Exc[i,j] = np.mean(At)
-                # End loop over rates
-             
-                # clear tmp variables
-                del At, S, s
+                Exc[i] = stimulated(self.stimuli, self.N, W, T, self.r2, runs, fract, steps//10)
             # END DYNAMICAL RANGE
         
         # END LOOP OVER TEMPERATUREs
@@ -397,28 +387,23 @@ class HTC:
             print(self.title + '\n')
             print('End simulating activity')
         
-        # Reshape pdfs
-        pdf_ev = reshape_pdf(pdf_ev)
-        
-        # Reshape spectrum
-        spectr = np.vstack(spectr)
+        if complete_simulation:
+            # Reshape pdfs
+            pdf_ev = reshape_pdf(pdf_ev)
+            # Reshape spectrum
+            spectr = np.vstack(spectr)
 
         # RETURN RESULTS
         if cluster:
             # Reshape cluster pdf
             pdf = reshape_pdf(pdf)
             
-            return (A, sigma_A, Chi, sigma_Chi, 
-                    ev, sigma_ev, spectr, act, pdf_ev, Exc,
-                    pdf_size, pdf_time,
-                    S1/self.N, S2/self.N, pdf)
-        else:
-            return (A, sigma_A, Chi, sigma_Chi, 
-                    ev, sigma_ev, spectr, act, pdf_ev, Exc,
-                    pdf_size, pdf_time)
+        return (A, sigma_A, Fisher, spectr, act, pdf_ev, Exc,
+                pdf_size, pdf_time, pdf_size_causal, pdf_time_causal,
+                S1/self.N, S2/self.N, pdf)
         
         
-    def save(self, results_folder, cluster, dinamical):
+    def save(self, results_folder, cluster, dinamical, complete_simulation):
         '''
         Save output
         '''        
@@ -432,30 +417,29 @@ class HTC:
         if self.network == 'connectome':
             np.savetxt(filename + delimiter + 'series.txt', np.vstack((self.act, self.act_norm)), fmt='%e')
         
-        # Save power spectrum
-        np.savetxt(filename + delimiter + 'spectrum.txt', np.vstack((self.spectr, self.spectr_norm)), fmt='%e')
-        # Save pdfs
-        write_lists(self.pdf_ev, self.pdf_ev_norm, filename + delimiter + 'pdf_ev.txt')
-        
+        if complete_simulation:
+            # Save power spectrum
+            np.savetxt(filename + delimiter + 'spectrum.txt', np.vstack((self.spectr, self.spectr_norm)), fmt='%e')
+            # Save interevent pdf
+            write_lists(self.pdf_ev, self.pdf_ev_norm, filename + delimiter + 'pdf_ev.txt')
+            # Save avalanches pdf
+            write_lists(self.pdf_size, self.pdf_size_norm, filename + delimiter + 'pdf_aval_size.txt')
+            write_lists(self.pdf_time, self.pdf_time_norm, filename + delimiter + 'pdf_aval_time.txt')
+            # Save causal avalanches pdf
+            write_lists(self.pdf_size_causal, self.pdf_size_causal_norm, filename + delimiter + 'pdf_aval_size_causal.txt')
+            write_lists(self.pdf_time_causal, self.pdf_time_causal_norm, filename + delimiter + 'pdf_aval_time_causal.txt')
+                    
         # Save stimulated activity
         if dinamical:
             np.savetxt(filename + delimiter + 'stimulated.txt', np.vstack((self.Exc, self.Exc_norm)), fmt='%e')
         
-        if not cluster:
-            np.savetxt(filename + delimiter + 'observables.txt',
-                       (self.A, self.sigmaA, self.Chi, self.sigmaChi,
-                        self.Ev, self.sigmaEv,
-                        self.A_norm, self.sigmaA_norm, self.Chi_norm, self.sigmaChi_norm,
-                        self.Ev_norm, self.sigmaEv_norm
-                        ), fmt='%e')
-            
-        else:
-            np.savetxt(filename + delimiter + 'observables.txt',
-                       (self.A, self.sigmaA, self.Chi, self.sigmaChi,
-                        self.Ev, self.sigmaEv, self.S1, self.S2,
-                        self.A_norm, self.sigmaA_norm, self.Chi_norm, self.sigmaChi_norm,
-                        self.Ev_norm, self.sigmaEv_norm, self.S1_norm, self.S2_norm), fmt='%e')
-            
+        np.savetxt(filename + delimiter + 'observables.txt',
+                   (self.A, self.sigmaA, self.Fisher,
+                    self.S1, self.S2,
+                    self.A_norm, self.sigmaA_norm, self.Fisher_norm,
+                    self.S1_norm, self.S2_norm), fmt='%e')
+        
+        if cluster:
             write_lists(self.pdf, self.pdf_norm, filename + delimiter + 'pdf.txt')
         
         print('Saved '+str(self.name))
