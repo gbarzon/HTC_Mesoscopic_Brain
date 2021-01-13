@@ -514,7 +514,7 @@ def find_nearest(array, value):
     idx = (np.abs(array - value)).argmin()
     return idx
 
-def get_dynamical_range(mod):
+def get_dynamical_range(mod, low=0.15, high=0.85):
     '''
     Compute the dynamical range
     '''
@@ -526,7 +526,7 @@ def get_dynamical_range(mod):
         
         # Get A90 and A10
         Amax, Amin = np.max(mod.Exc[i]), np.min(mod.Exc[i])
-        A10, A90 = (Amax-Amin)*0.15 + Amin, (Amax-Amin)*0.85 + Amin
+        A10, A90 = (Amax-Amin)*low + Amin, (Amax-Amin)*high + Amin
         # Get corresponent index
         s10 = np.where( (A10 > mod.Exc[i][:-1])*(A10 < mod.Exc[i][1:]) )[0][-1]
         s90 = np.where( (A90 > mod.Exc[i][:-1])*(A90 < mod.Exc[i][1:]) )[0][0]
@@ -541,7 +541,7 @@ def get_dynamical_range(mod):
         
         # Get A90 and A10
         Amax, Amin = np.max(mod.Exc_norm[i]), np.min(mod.Exc_norm[i])
-        A10, A90 = (Amax-Amin)*0.15 + Amin, (Amax-Amin)*0.85 + Amin
+        A10, A90 = (Amax-Amin)*low + Amin, (Amax-Amin)*high + Amin
         # Get corresponent index
         s10 = np.where( (A10 > mod.Exc_norm[i][:-1])*(A10 < mod.Exc_norm[i][1:]) )[0][-1]
         s90 = np.where( (A90 > mod.Exc_norm[i][:-1])*(A90 < mod.Exc_norm[i][1:]) )[0][0]

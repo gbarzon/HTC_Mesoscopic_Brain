@@ -87,19 +87,25 @@ class HTC:
             tmp.spectr, tmp.spectr_norm = spectr[:len(spectr)//2], spectr[len(spectr)//2:]
             del spectr
         
-        # Load pdfs
+        ### Load pdfs
+        # Cluster
         if Path(filename+delimiter+str('pdf.txt')).is_file():
             tmp.pdf, tmp.pdf_norm = read_lists(filename+delimiter+str('pdf.txt'))
+        # Interevent
         if Path(filename+delimiter+str('pdf_ev.txt')).is_file():
             tmp.pdf_ev, tmp.pdf_ev_norm = read_lists(filename+delimiter+'pdf_ev.txt')
-        if Path(filename+delimiter+str('pdf_size.txt')).is_file():
-            tmp.pdf_ev, tmp.pdf_ev_norm = read_lists(filename+delimiter+'pdf_size.txt')
-        if Path(filename+delimiter+str('pdf_time.txt')).is_file():
-            tmp.pdf_ev, tmp.pdf_ev_norm = read_lists(filename+delimiter+'pdf_time.txt')
-        if Path(filename+delimiter+str('pdf_size_causal.txt')).is_file():
-            tmp.pdf_ev, tmp.pdf_ev_norm = read_lists(filename+delimiter+'pdf_size_causal.txt')
-        if Path(filename+delimiter+str('pdf_time_causal.txt')).is_file():
-            tmp.pdf_ev, tmp.pdf_ev_norm = read_lists(filename+delimiter+'pdf_time_causal.txt')
+        # Aval size
+        if Path(filename+delimiter+str('pdf_aval_size.txt')).is_file():
+            tmp.pdf_size, tmp.pdf_size_norm = read_lists(filename+delimiter+'pdf_aval_size.txt')
+        # Aval time
+        if Path(filename+delimiter+str('pdf_aval_time.txt')).is_file():
+            tmp.pdf_time, tmp.pdf_time_norm = read_lists(filename+delimiter+'pdf_aval_time.txt')
+        # Causal aval size
+        if Path(filename+delimiter+str('pdf_aval_size_causal.txt')).is_file():
+            tmp.pdf_size_causal, tmp.pdf_size_causal_norm = read_lists(filename+delimiter+'pdf_aval_size_causal.txt')
+        # Causal aval time
+        if Path(filename+delimiter+str('pdf_aval_time_causal.txt')).is_file():
+            tmp.pdf_time_causal, tmp.pdf_time_causal_norm = read_lists(filename+delimiter+'pdf_aval_time_causal.txt')
         
         # Load stimulated activity (if present)
         if Path(filename+delimiter+str('stimulated.txt')).is_file():

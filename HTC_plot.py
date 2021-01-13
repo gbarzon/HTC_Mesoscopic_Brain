@@ -53,9 +53,9 @@ class plotHTC:
         elif var_to_print == 'cluster':
             self.template_plot(model.Trange, model.Tc*Tc, model.Tc*Tc_norm, model.S1, model.S1_norm, 'S1',
                               model.S2, model.S2_norm, 'S2', model.title)
-        elif var_to_print == 'corr':
-            self.template_plot(model.Trange, model.Tc*Tc, model.Tc*Tc_norm, model.C, model.C_norm, 'C',
-                              model.sigmaC, model.sigmaC_norm, '\sigma(C)', model.title)
+        elif var_to_print == 'fisher':
+            self.template_plot(model.Trange, model.Tc*Tc, model.Tc*Tc_norm, model.Fisher, model.Fisher_norm, 'Fisher \  information',
+                               title=model.title)
         elif var_to_print == 'ent':
             self.template_plot(model.Trange, model.Tc*Tc, model.Tc*Tc_norm, model.Ent, model.Ent_norm, 'Ent',
                               model.sigmaEnt, model.sigmaEnt_norm, '\sigma(Ent)', model.title)
@@ -86,7 +86,7 @@ class plotHTC:
         
         for i in range(len(Ts)):
             # plot time series
-            ax = plt.subplot(4, len(Ts), i+1)
+            ax = plt.subplot(3, len(Ts), i+1)
             
             plt.title('T='+str(round(Ts[i]/np.argmax(model.S2_norm),2))+'*Tc', size=13)
             plt.plot(range(N), model.act[Ts[i]][100:N+100], c='black', lw=0.8)
@@ -102,7 +102,7 @@ class plotHTC:
                 plt.ylabel(r'$<A(t)>$', size=13)
                 
             # plot normalized time series
-            ax = plt.subplot(4, len(Ts), i+1+len(Ts))
+            ax = plt.subplot(3, len(Ts), i+1+len(Ts))
             
             plt.plot(range(N), model.act_norm[Ts[i]][100:N+100], c='red', lw=0.8)
             plt.xlabel('t', size=13)
@@ -117,7 +117,7 @@ class plotHTC:
                 plt.ylabel(r'$<A_{norm}(t)>$', size=13)
             
             # plot power spectrum
-            ax = plt.subplot(4, len(Ts), i+1+2*len(Ts))
+            ax = plt.subplot(3, len(Ts), i+1+2*len(Ts))
             
             freq = np.arange(len(model.spectr[0])) / len(model.spectr[0])
             
@@ -137,7 +137,8 @@ class plotHTC:
                 ax.set_yticklabels([])
             if i==0:
                 plt.ylabel(r'$P(f)$', size=13)
-                
+              
+            '''
             # plot cluster distribution
             ax = plt.subplot(4, len(Ts), i+1+3*len(Ts))
             
@@ -158,10 +159,10 @@ class plotHTC:
                 ax.set_yticklabels([])
             if i==0:
                 plt.ylabel(r'$pdf(s)$', size=13)
-
+            '''
         plt.show()
     
-    def plot_pdf(self, mod, xlabel, Nbins=None):
+    def plot_pdf(self, mod, xlabel, Nbins=None, yrange=None):
         cm1 = cm.get_cmap('jet')
         fact = 8
         
@@ -174,9 +175,21 @@ class plotHTC:
         elif xlabel == 'ev':
             pdf, pdf_norm = mod.pdf_ev, mod.pdf_ev_norm
             xlabel = r'$t_{ev}$'
-        elif xlabel == 'tau':
-            pdf, pdf_norm = mod.pdf_tau, mod.pdf_tau_norm
-            xlabel = r'$tau$'
+        elif xlabel == 'size':
+            pdf, pdf_norm = mod.pdf_size, mod.pdf_size_norm
+            xlabel = r'$size$'
+        elif xlabel == 'size':
+            pdf, pdf_norm = mod.pdf_size, mod.pdf_size_norm
+            xlabel = r'$size$'
+        elif xlabel == 'time':
+            pdf, pdf_norm = mod.pdf_time, mod.pdf_time_norm
+            xlabel = r'$time$'
+        elif xlabel == 'size_causal':
+            pdf, pdf_norm = mod.pdf_size_causal, mod.pdf_size_causal_norm
+            xlabel = r'$size, causal$'
+        elif xlabel == 'time_causal':
+            pdf, pdf_norm = mod.pdf_time_causal, mod.pdf_time_causal_norm
+            xlabel = r'$time, causal$'
         
         plt.figure(figsize=(20,6))
         
@@ -200,6 +213,8 @@ class plotHTC:
                 
         plt.xlabel(xlabel, fontsize=13)
         plt.ylabel('pdf', fontsize=13)
+        if not yrange is None:
+            plt.ylim(yrange)
         plt.grid()
         plt.legend(title='W', fontsize=13)
         
@@ -223,6 +238,8 @@ class plotHTC:
         
         plt.xlabel(xlabel, fontsize=13)
         plt.ylabel('pdf', fontsize=13)
+        if not yrange is None:
+            plt.ylim(yrange)
         plt.grid()
         plt.legend(title=r'$W_{norm}$', fontsize=13)
         plt.show()
@@ -270,7 +287,7 @@ class plotHTC:
         plt.legend(fontsize=12, title=r'$W_{norm}$')
     
     
-    def plot_dynamical_range(self, mod):
+    def plot_dynamical_range(self, mod, low=0.15, high=0.85):
         plt.figure(figsize=(20,6))
 
         Trange = mod.Trange / mod.Tc / mod.Tmax / np.argmax(mod.S2) * (len(mod.Trange)-1)
@@ -314,7 +331,7 @@ class plotHTC:
     
         # Dynamical range
         from HTC_utils import get_dynamical_range
-        delta, delta_norm = get_dynamical_range(mod)
+        delta, delta_norm = get_dynamical_range(mod, low, high)
 
         
         Trange = mod.Trange / mod.Tc / mod.Tmax / np.argmax(mod.S2) * (len(mod.Trange)-1)
