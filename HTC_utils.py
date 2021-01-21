@@ -5,6 +5,7 @@ from scipy.signal import periodogram
 import igraph as gf
 from collections import Counter
 
+parallel=True
 
 # ---------- GENERAL FUNCTIONS ----------
 def power_law(a, b, g, size):
@@ -64,7 +65,7 @@ def read_lists(fname):
 
 
 # ---------- HTC SIMULATION ----------
-@jit(nopython=True)
+@jit(nopython=True, parallel=parallel)
 def init_state(N, runs, fract):
     '''
     Initialize the state of the system
@@ -123,7 +124,7 @@ def update_state_single(S, W, T, r1, r2, aval, step, avalOn):
 
     return newS, newAval
 
-@jit(nopython=True)
+@jit(nopython=True, parallel=parallel)
 def update_state(S, W, T, r1, r2, aval, step, avalOn=True):
     '''
     Update state of each runs
@@ -160,7 +161,7 @@ def stimulated_activity(W, runs, steps, r1, r2):
     
 
 # ---------- HTC OBSERVABLES ----------
-@jit(nopython=True)
+@jit(nopython=True, parallel=parallel)
 def fisher_information(mat):
     '''
     Return the average Fisher information btw each run.
@@ -169,7 +170,7 @@ def fisher_information(mat):
     '''    
     runs, steps, N = mat.shape
     
-    fisher = 0
+    fisher = np.zeros(runs)
     
     # Loop over runs
     for i in prange(runs):
@@ -180,9 +181,9 @@ def fisher_information(mat):
         Cij = (Cij * mask).flatten()
         Cij = Cij[Cij != 0]
         
-        fisher += np.mean(Cij)
+        fisher[i] = np.mean(Cij)
         
-    return fisher / runs
+    return np.mean(fisher)
 
 
 def entropy(data):
@@ -298,7 +299,7 @@ def myConnectedComponents(W, s):
     
     return -np.sort(-cc)
 
-@jit(nopython=True)
+@jit(nopython=True, parallel=parallel)
 def compute_clusters(W, s):
     '''
     Cluster size analysis for each run

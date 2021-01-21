@@ -32,11 +32,17 @@ def get_mean_HTC(folder, name, N):
         
     # Load pdfs
     pdf_ev = [list_to_counter(x) for x in mean.pdf_ev]
-    pdf_tau = [list_to_counter(x) for x in mean.pdf_tau]
     pdf_ev_norm = [list_to_counter(x) for x in mean.pdf_ev_norm]
-    pdf_tau_norm = [list_to_counter(x) for x in mean.pdf_tau_norm]
     pdf = [list_to_counter(x) for x in mean.pdf]
     pdf_norm = [list_to_counter(x) for x in mean.pdf_norm]
+    pdf_size = [list_to_counter(x) for x in mean.pdf_size]
+    pdf_size_norm = [list_to_counter(x) for x in mean.pdf_size_norm]
+    pdf_time = [list_to_counter(x) for x in mean.pdf_time]
+    pdf_time_norm = [list_to_counter(x) for x in mean.pdf_time_norm]
+    pdf_size_causal = [list_to_counter(x) for x in mean.pdf_size_causal]
+    pdf_size_causal_norm = [list_to_counter(x) for x in mean.pdf_size_causal_norm]
+    pdf_time_causal = [list_to_counter(x) for x in mean.pdf_time_causal]
+    pdf_time_causal_norm = [list_to_counter(x) for x in mean.pdf_time_causal_norm]
 
     for i in range(1,N):
         # Load model
@@ -44,38 +50,21 @@ def get_mean_HTC(folder, name, N):
         # Standard
         mean.A += mod.A
         mean.sigmaA += mod.sigmaA
-        mean.C += mod.C
-        mean.sigmaC += mod.sigmaC
-        mean.Ent += mod.Ent
-        mean.sigmaEnt += mod.sigmaEnt
-        mean.Ev += mod.Ev
-        mean.sigmaEv += mod.sigmaEv
-        mean.Tau += mod.Tau
-        mean.sigmaTau += mod.sigmaTau
-        mean.Chi += mod.Chi
-        mean.sigmaChi += mod.sigmaChi
+        mean.Fisher += mod.Fisher
         mean.S1 += mod.S1
         mean.S2 += mod.S2
     
         # Normalized
         mean.A_norm += mod.A_norm
         mean.sigmaA_norm += mod.sigmaA_norm
-        mean.C_norm += mod.C_norm
-        mean.sigmaC_norm += mod.sigmaC_norm
-        mean.Ent_norm += mod.Ent_norm
-        mean.sigmaEnt_norm += mod.sigmaEnt_norm
-        mean.Ev_norm += mod.Ev_norm
-        mean.sigmaEv_norm += mod.sigmaEv_norm
-        mean.Tau_norm += mod.Tau_norm
-        mean.sigmaTau_norm += mod.sigmaTau_norm
-        mean.Chi_norm += mod.Chi_norm
-        mean.sigmaChi_norm += mod.sigmaChi_norm
+        mean.Fisher_norm += mod.Fisher_norm
         mean.S1_norm += mod.S1_norm
         mean.S2_norm += mod.S2_norm
         
         # Tc
         param[i, 0], param_norm[i, 0] = get_Tc(mod)
         
+        '''
         # Degree
         W, W_norm = mod.W, normalize(mod.W)
         
@@ -89,6 +78,7 @@ def get_mean_HTC(folder, name, N):
         lmbd = largest_eig(W, eigvals=(W.shape[0]-1,W.shape[0]-1), eigvals_only=True)
         lmbd_norm = largest_eig(W_norm, eigvals=(W.shape[0]-1,W.shape[0]-1), eigvals_only=True)
         param[i, 2], param_norm[i, 2] = lmbd, lmbd_norm
+        '''
         
         # Dinamical range
         mean.Exc += mod.Exc
@@ -101,31 +91,27 @@ def get_mean_HTC(folder, name, N):
 
             # Pdfs
             pdf_ev[i] += list_to_counter(mod.pdf_ev[i])
-            pdf_tau[i] += list_to_counter(mod.pdf_tau[i])
             pdf_ev_norm[i] += list_to_counter(mod.pdf_ev_norm[i])
-            pdf_tau_norm[i] += list_to_counter(mod.pdf_tau_norm[i])
             pdf[i] += list_to_counter(mod.pdf[i])
             pdf_norm[i] += list_to_counter(mod.pdf_norm[i])
+            pdf_size[i] += list_to_counter(mod.pdf_size[i])
+            pdf_size_norm[i] += list_to_counter(mod.pdf_size_norm[i])
+            pdf_time[i] += list_to_counter(mod.pdf_time[i])
+            pdf_time_norm[i] += list_to_counter(mod.pdf_time_norm[i])
+            pdf_size_causal[i] += list_to_counter(mod.pdf_size_causal[i])
+            pdf_size_causal_norm[i] += list_to_counter(mod.pdf_size_causal_norm[i])
+            pdf_time_causal[i] += list_to_counter(mod.pdf_time_causal[i])
+            pdf_time_causal_norm[i] += list_to_counter(mod.pdf_time_causal_norm[i])
+            
+            # Pdf aval
     
     # Divide by N all the variables
-    mean.A, mean.sigmaA, mean.C, mean.sigmaC, \
-    mean.Ent, mean.sigmaEnt, mean.Ev, mean.sigmaEv, \
-    mean.Tau, mean.sigmaTau, mean.Chi, mean.sigmaChi, \
-    mean.S1, mean.S2 = \
-    mean.A/N, mean.sigmaA/N, mean.C/N, mean.sigmaC/N, \
-    mean.Ent/N, mean.sigmaEnt/N, mean.Ev/N, mean.sigmaEv/N, \
-    mean.Tau/N, mean.sigmaTau/N, mean.Chi/N, mean.sigmaChi/N, \
-    mean.S1/N, mean.S2/N
+    mean.A, mean.sigmaA, mean.Fisher, mean.S1, mean.S2 = \
+    mean.A/N, mean.sigmaA/N, mean.Fisher/N, mean.S1/N, mean.S2/N
 
     # Divide by N all the normalized variables
-    mean.A_norm, mean.sigmaA_norm, mean.C_norm, mean.sigmaC_norm, \
-    mean.Ent_norm, mean.sigmaEnt_norm, mean.Ev_norm, mean.sigmaEv_norm, \
-    mean.Tau_norm, mean.sigmaTau_norm, mean.Chi_norm, mean.sigmaChi_norm, \
-    mean.S1_norm, mean.S2_norm = \
-    mean.A_norm/N, mean.sigmaA_norm/N, mean.C_norm/N, mean.sigmaC_norm/N, \
-    mean.Ent_norm/N, mean.sigmaEnt_norm/N, mean.Ev_norm/N, mean.sigmaEv_norm/N, \
-    mean.Tau_norm/N, mean.sigmaTau_norm/N, mean.Chi_norm/N, mean.sigmaChi_norm/N, \
-    mean.S1_norm/N, mean.S2_norm/N
+    mean.A_norm, mean.sigmaA_norm, mean.Fisher_norm, mean.S1_norm, mean.S2_norm = \
+    mean.A_norm/N, mean.sigmaA_norm/N, mean.Fisher_norm/N, mean.S1_norm/N, mean.S2_norm/N
     
     # Dinamical range
     mean.Exc /= N
@@ -138,21 +124,29 @@ def get_mean_HTC(folder, name, N):
 
     # Store pdfs
     mean.pdf_ev = reshape_pdf(pdf_ev)
-    mean.pdf_tau = reshape_pdf(pdf_tau)
     mean.pdf_ev_norm = reshape_pdf(pdf_ev_norm)
-    mean.pdf_tau_norm = reshape_pdf(pdf_tau_norm)
     mean.pdf = reshape_pdf(pdf)
     mean.pdf_norm = reshape_pdf(pdf_norm)
+    mean.pdf_size = reshape_pdf(pdf_size)
+    mean.pdf_size_norm = reshape_pdf(pdf_size_norm)
+    mean.pdf_time = reshape_pdf(pdf_time)
+    mean.pdf_time_norm = reshape_pdf(pdf_time_norm)
+    mean.pdf_size_causal = reshape_pdf(pdf_size_causal)
+    mean.pdf_size_causal_norm = reshape_pdf(pdf_size_causal_norm)
+    mean.pdf_time_causal = reshape_pdf(pdf_time_causal)
+    mean.pdf_time_causal_norm = reshape_pdf(pdf_time_causal_norm)
     
+    '''
     # Clean folder
     path = Path(folder)
     for file in path.iterdir():
         if name in str(file):
             if not 'observables' in str(file):
                 file.unlink()
-                
+    '''            
     # Save mean object            
-    mean.save(folder, cluster=True, dinamical=True)
+    #mean.save(folder, cluster=True, dinamical=True)
     # Save Tc's
-    np.savetxt(folder+name+'_'+'Tc.txt', np.vstack(param, param_norm), fmt='%e')
+    #np.savetxt(folder+name+'_'+'Tc.txt', np.vstack(param, param_norm), fmt='%e')
+    return mean, Tc, Tc_norm
     

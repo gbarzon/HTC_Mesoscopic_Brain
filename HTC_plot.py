@@ -1,5 +1,6 @@
 import numpy as np
 import networkx as nx
+from statsmodels.tsa.stattools import acf
 
 import matplotlib.pyplot as plt
 
@@ -86,7 +87,7 @@ class plotHTC:
         
         for i in range(len(Ts)):
             # plot time series
-            ax = plt.subplot(3, len(Ts), i+1)
+            ax = plt.subplot(4, len(Ts), i+1)
             
             plt.title('T='+str(round(Ts[i]/np.argmax(model.S2_norm),2))+'*Tc', size=13)
             plt.plot(range(N), model.act[Ts[i]][100:N+100], c='black', lw=0.8)
@@ -102,7 +103,7 @@ class plotHTC:
                 plt.ylabel(r'$<A(t)>$', size=13)
                 
             # plot normalized time series
-            ax = plt.subplot(3, len(Ts), i+1+len(Ts))
+            ax = plt.subplot(4, len(Ts), i+1+len(Ts))
             
             plt.plot(range(N), model.act_norm[Ts[i]][100:N+100], c='red', lw=0.8)
             plt.xlabel('t', size=13)
@@ -117,7 +118,7 @@ class plotHTC:
                 plt.ylabel(r'$<A_{norm}(t)>$', size=13)
             
             # plot power spectrum
-            ax = plt.subplot(3, len(Ts), i+1+2*len(Ts))
+            ax = plt.subplot(4, len(Ts), i+1+2*len(Ts))
             
             freq = np.arange(len(model.spectr[0])) / len(model.spectr[0])
             
@@ -137,6 +138,26 @@ class plotHTC:
                 ax.set_yticklabels([])
             if i==0:
                 plt.ylabel(r'$P(f)$', size=13)
+                
+            # plot autocorrelation
+            nlags = 30
+            ax = plt.subplot(4, len(Ts), i+1+3*len(Ts))
+            
+            plt.plot(acf(model.act[Ts[i]], nlags=nlags, fft=False), alpha=0.7, label=r'$Acf(\tau)$', c='black')
+            plt.plot(acf(model.act_norm[Ts[i]], nlags=nlags, fft=False),
+                     alpha=0.7, label=r'$Acf_{norm}(\tau)$', c='red')
+            
+            plt.grid()
+            
+            if i==len(Ts)-1:
+                plt.legend()
+                y_labels = ax.get_yticks()
+                ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%0.0e'))
+                ax.yaxis.tick_right()
+            else:
+                ax.set_yticklabels([])
+            if i==0:
+                plt.ylabel(r'$Acf(\tau)$', size=13)
               
             '''
             # plot cluster distribution
@@ -162,7 +183,7 @@ class plotHTC:
             '''
         plt.show()
     
-    def plot_pdf(self, mod, xlabel, Nbins=None, yrange=None):
+    def plot_pdf(self, mod, xlabel, Nbins=None, yrange=None, scale='loglog'):
         cm1 = cm.get_cmap('jet')
         fact = 8
         
@@ -195,8 +216,12 @@ class plotHTC:
         
         # Pdf
         plt.subplot(1, 2, 1)
-        plt.xscale('log')
-        plt.yscale('log')
+        
+        if scale == 'log':
+            plt.yscale('log')
+        elif scale == 'loglog':
+            plt.xscale('log')
+            plt.yscale('log')
 
         for i in range(2,8):
             val = 0.2 * i
@@ -220,8 +245,12 @@ class plotHTC:
         
         # Pdf norm
         plt.subplot(1, 2, 2)
-        plt.xscale('log')
-        plt.yscale('log')
+        
+        if scale == 'log':
+            plt.yscale('log')
+        elif scale == 'loglog':
+            plt.xscale('log')
+            plt.yscale('log')
 
         for i in range(2,8):
             val = 0.2 * i

@@ -8,13 +8,15 @@ import itertools
 
 if __name__ == '__main__':
     
-    nets = ['random', 'small', 'barabasi']
+    #nets = ['random', 'small', 'barabasi']
+    nets = ['random']
     
     # Simulation parameters
     N = 66
     dT = 0.03
     runs = 100
-    ps = [0.1, 0.2, 0.3, 0.4, 0.5]
+    #ps = [0.1, 0.2, 0.3, 0.4, 0.5]
+    ps = [1.]
     
     # Start Dask client
     client = Client()
@@ -56,10 +58,12 @@ if __name__ == '__main__':
         processed = client.map(lambda obj: obj.simulate(folder, cluster=True, dinamical=True, runs=1), mods)
         # Run the actual computation
         client.gather(processed)
-    
+        
+        '''
         # Get mean object and clean folder
         for name in names:
             get_mean_HTC(folder, name, runs)
+        '''
     
     stop = time.time()
     print('Total execution time: '+str((stop-start)/60)+'mins')
