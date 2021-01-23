@@ -179,8 +179,8 @@ class HTC:
         
         # Generate adjacency matrix
         if self.network == 'connectome':
-            #self.W = np.loadtxt('dati/RSN/RSN_matrix.txt')
-            self.W = np.loadtxt('dati/Hagmann/group_mean_connectivity_matrix.txt')
+            self.W = np.loadtxt('dati/RSN/RSN_matrix.txt')
+            #self.W = np.loadtxt('dati/Hagmann/group_mean_connectivity_matrix.txt')
         else:
             if self.network == 'random':
                 top = nx.erdos_renyi_graph(self.N, self.p)

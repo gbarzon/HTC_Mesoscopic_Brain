@@ -75,15 +75,13 @@ class plotHTC:
                                title=model.title)
             
         
-    def plot_series(self, model):
+    def plot_series(self, model, y_lim, N):
         import matplotlib.ticker as ticker
 
         plt.figure(figsize=(16,16))
         
-        # length of sketch of time series to be plotted
-        N = 200
-        
-        Ts = [len(model.Trange)//5, np.argmax(model.S2_norm), len(model.Trange)-len(model.Trange)//4]
+        Ts = np.array([2/3, 1, 4/3]) * np.argmax(model.S2_norm)
+        Ts = Ts.astype(int)
         
         for i in range(len(Ts)):
             # plot time series
@@ -92,7 +90,7 @@ class plotHTC:
             plt.title('T='+str(round(Ts[i]/np.argmax(model.S2_norm),2))+'*Tc', size=13)
             plt.plot(range(N), model.act[Ts[i]][100:N+100], c='black', lw=0.8)
             plt.xlabel('t', size=13)
-            plt.ylim( [-0.05, 0.42] )
+            plt.ylim( y_lim )
             plt.grid()
             
             if i==len(Ts)-1:
@@ -107,7 +105,7 @@ class plotHTC:
             
             plt.plot(range(N), model.act_norm[Ts[i]][100:N+100], c='red', lw=0.8)
             plt.xlabel('t', size=13)
-            plt.ylim( [-0.05, 0.42] )
+            plt.ylim( y_lim )
             plt.grid()
             
             if i==len(Ts)-1:
@@ -140,7 +138,7 @@ class plotHTC:
                 plt.ylabel(r'$P(f)$', size=13)
                 
             # plot autocorrelation
-            nlags = 30
+            nlags = 50
             ax = plt.subplot(4, len(Ts), i+1+3*len(Ts))
             
             plt.plot(acf(model.act[Ts[i]], nlags=nlags, fft=False), alpha=0.7, label=r'$Acf(\tau)$', c='black')
@@ -316,7 +314,7 @@ class plotHTC:
         plt.legend(fontsize=12, title=r'$W_{norm}$')
     
     
-    def plot_dynamical_range(self, mod, low=0.15, high=0.85):
+    def plot_dynamical_range(self, mod, ylim, low=0.15, high=0.85):
         plt.figure(figsize=(20,6))
 
         Trange = mod.Trange / mod.Tc / mod.Tmax / np.argmax(mod.S2) * (len(mod.Trange)-1)
@@ -373,6 +371,7 @@ class plotHTC:
 
         plt.xlabel(r'$T/T_c$', size=13)
         plt.ylabel(r'$ dynamical \ range \ \Delta$', size=13)
+        plt.ylim( ylim )
         plt.grid()
         plt.legend(fontsize=12)
 
