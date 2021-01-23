@@ -11,7 +11,7 @@ if __name__ == '__main__':
     
     start = time.time()
     
-    tmp = HTC('connectome', dT=0.05, Nstim=50)
+    tmp = HTC('connectome', dT=0.03, Nstim=50)
     tmp.verbose=True
     tmp.simulate(folder)
     

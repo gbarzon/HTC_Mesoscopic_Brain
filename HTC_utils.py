@@ -414,9 +414,16 @@ def get_avalanches_pdf(data, threshold=1., Nbins=50):
     av_size = np.delete(av_size, 0)
     av_time = np.delete(av_time, 0)
     
-    # Get histograms to compress data
-    hist_size = np.histogram(av_size, bins = Nbins)
-    hist_time = np.histogram(av_time, bins = Nbins)
+    # Get histograms to compress data (logarithmic bins)
+    a_min = np.min(av_size)
+    a_max = np.max(av_size)
+    #hist_size = np.histogram(av_size, bins = Nbins)
+    hist_size = np.histogram(av_size, bins = 10 ** np.linspace(np.log10(a_min), np.log10(a_max), Nbins))
+    
+    a_min = np.min(av_time)
+    a_max = np.max(av_time)
+    #hist_time = np.histogram(av_time, bins = Nbins)
+    hist_time = np.histogram(av_time, bins = 10 ** np.linspace(np.log10(a_min), np.log10(a_max), Nbins))
             
     # Convert bin edges to bin center
     hist_size = np.vstack( ( (hist_size[1][1:] + hist_size[1][:-1])/2, hist_size[0] ) )
@@ -474,13 +481,16 @@ def get_causal_avalanches_pdf(aval, Nbins=50):
     sizes = np.delete(sizes, 0)
     times = np.delete(times, 0)
     
-    # Get histograms to compress data
-    hist_size = np.histogram(sizes, bins = Nbins)
-    hist_time = np.histogram(times, bins = Nbins)
-            
-    # Convert bin edges to bin center
-    hist_size = np.vstack( ( (hist_size[1][1:] + hist_size[1][:-1])/2, hist_size[0] ) )
-    hist_time = np.vstack( ( (hist_time[1][1:] + hist_time[1][:-1])/2, hist_time[0] ) )
+    # Get histograms to compress data (logarithmic bins)
+    a_min = np.min(av_size)
+    a_max = np.max(av_size)
+    #hist_size = np.histogram(av_size, bins = Nbins)
+    hist_size = np.histogram(av_size, bins = 10 ** np.linspace(np.log10(a_min), np.log10(a_max), Nbins))
+    
+    a_min = np.min(av_time)
+    a_max = np.max(av_time)
+    #hist_time = np.histogram(av_time, bins = Nbins)
+    hist_time = np.histogram(av_time, bins = 10 ** np.linspace(np.log10(a_min), np.log10(a_max), Nbins))
     
     return hist_size, hist_time
 
