@@ -226,11 +226,12 @@ class plotHTC:
             ind = find_nearest(Trange, val)
             
             if Nbins==None:
-                plt.scatter(pdf[ind][0], pdf[ind][1]/np.sum(pdf[ind][1]),
+                dx = pdf[ind][0][1]-pdf[ind][0][0]
+                plt.scatter(pdf[ind][0], pdf[ind][1] / np.sum(pdf[ind][1]) / dx,
                             label='T='+str(round(val,1))+'*Tc', alpha=0.8, s=20,
                             c=[cm1(i/fact)]*len(pdf[ind][0]))
             else:
-                ist = np.histogram(pdf[ind][0], weights=pdf[ind][1]/np.sum(pdf[ind][1]), bins=Nbins)
+                ist = np.histogram(pdf[ind][0], weights=pdf[ind][1], bins=Nbins, density=True)
                 plt.scatter( (ist[1][1:] + ist[1][:-1])/2, ist[0], label='T='+str(round(val,1))+'*Tc', s=20,
                             c=[cm1(i/fact)]*len(ist[0]))
                 
@@ -255,11 +256,12 @@ class plotHTC:
             ind = find_nearest(Trange, val)
         
             if Nbins==None:
-                plt.scatter(pdf_norm[ind][0], pdf_norm[ind][1]/np.sum(pdf_norm[ind][1]),
+                dx = pdf_norm[ind][0][1] - pdf_norm[ind][0][0]
+                plt.scatter(pdf_norm[ind][0], pdf_norm[ind][1] / np.sum(pdf_norm[ind][1]) / dx,
                             label='T='+str(round(val,1))+'*Tc',alpha=0.8, s=20,
                             c=[cm1(i/fact)]*len(pdf_norm[ind][0]))
             else:
-                ist = np.histogram(pdf_norm[ind][0], weights=pdf_norm[ind][1]/np.sum(pdf_norm[ind][1]), bins=Nbins)
+                ist = np.histogram(pdf_norm[ind][0], weights=pdf_norm[ind][1], bins=Nbins, density=True)
                 plt.scatter( (ist[1][1:] + ist[1][:-1])/2, ist[0], label='T='+str(round(val,1))+'*Tc', s=20,
                             c=[cm1(i/fact)]*len(ist[0]))
         
