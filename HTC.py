@@ -376,6 +376,11 @@ class HTC:
                                          bins = np.logspace( np.log10(np.min(times)), np.log10(np.max(times)), Nbins),
                                          density=True)
                 
+                # Reshape histograms
+                center = 10 ** ( ( np.log10(hist_size[1][1:]) + np.log10(hist_size[1][:-1]) ) / 2 )
+                hist_size = np.array(( center, hist_size[0] ))
+                center = 10 ** ( ( np.log10(hist_time[1][1:]) + np.log10(hist_time[1][:-1]) ) / 2 )
+                hist_time = np.array(( center, hist_time[0] ))
                 pdf_size.append( hist_size )
                 pdf_time.append( hist_time )
             
@@ -396,8 +401,14 @@ class HTC:
                                          bins = np.logspace( np.log10(np.min(times)), np.log10(np.max(times)), Nbins),
                                          density=True)
                 
+                # Reshape histograms
+                center = 10 ** ( ( np.log10(hist_size[1][1:]) + np.log10(hist_size[1][:-1]) ) / 2 )
+                hist_size = np.array(( center, hist_size[0] ))
+                center = 10 ** ( ( np.log10(hist_time[1][1:]) + np.log10(hist_time[1][:-1]) ) / 2 )
+                hist_time = np.array(( center, hist_time[0] ))
                 pdf_size_causal.append( hist_size )
                 pdf_time_causal.append( hist_time )
+                
                 del hist_size, hist_time, aval_ij   # clear tmp variables
                 # END COMPUTE CAUSAL AVALANCHES
                 

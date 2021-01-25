@@ -412,7 +412,7 @@ def get_avalanches_pdf(data):
     runs = data.shape[0]
     
     for i in prange(runs):
-        tmp_size, tmp_time = get_avalanches(data[i], np.mean(data[i]))
+        tmp_size, tmp_time = get_avalanches(data[i], np.median(data[i]))
         av_size = np.hstack((av_size, tmp_size))
         av_time = np.hstack((av_time, tmp_time))
         
