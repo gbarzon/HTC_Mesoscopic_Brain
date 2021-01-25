@@ -349,8 +349,9 @@ class HTC:
                 # FISHER INFORMATION
                 if self.verbose: print('Computing Fisher information...')
                 Fisher[i] = fisher_information(Aij)
-            
+                
                 # INTER-EVENT TIME
+                
                 if self.verbose: print('Computing interevent time...')
                 pdf_ev[i] = Counter(interevent(Aij))
             
@@ -361,8 +362,20 @@ class HTC:
                 spectr.append(avg_pow_spec(At))
             
                 # COMPUTE AVALANCHES
+                
                 if self.verbose: print('Computing avalanches...')
-                hist_size, hist_time = get_avalanches_pdf(At)
+                sizes, times = get_avalanches_pdf(At)
+                
+                # Get histograms
+                Nbins = 50
+                hist_size = np.histogram(sizes,
+                                         bins = np.logspace( np.log10(np.min(sizes)), np.log10(np.max(sizes)), Nbins),
+                                         density=True)
+                
+                hist_time = np.histogram(times,
+                                         bins = np.logspace( np.log10(np.min(times)), np.log10(np.max(times)), Nbins),
+                                         density=True)
+                
                 pdf_size.append( hist_size )
                 pdf_time.append( hist_time )
             
@@ -371,15 +384,23 @@ class HTC:
             
                 # COMPUTE CAUSAL AVALANCHES
                 if self.verbose: print('Computing causal avalanches...')
-                runs_to_analyze = runs // 2
-                if runs_to_analyze == 0:
-                    runs_to_analyze = 1
-                hist_size, hist_time = get_causal_avalanches_pdf(aval_ij[:,:runs_to_analyze])
+                sizes, times = get_causal_avalanches_pdf(aval_ij)
+                
+                # Get histograms
+                Nbins = 50
+                hist_size = np.histogram(sizes,
+                                         bins = np.logspace( np.log10(np.min(sizes)), np.log10(np.max(sizes)), Nbins),
+                                         density=True)
+                
+                hist_time = np.histogram(times,
+                                         bins = np.logspace( np.log10(np.min(times)), np.log10(np.max(times)), Nbins),
+                                         density=True)
+                
                 pdf_size_causal.append( hist_size )
                 pdf_time_causal.append( hist_time )
                 del hist_size, hist_time, aval_ij   # clear tmp variables
                 # END COMPUTE CAUSAL AVALANCHES
-            
+                
             # DYNAMICAL RANGE
             if dinamical:
                 if self.verbose: print('\nSimulating dynamical range...')

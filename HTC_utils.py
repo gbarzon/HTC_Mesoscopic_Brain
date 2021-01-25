@@ -5,7 +5,7 @@ from scipy.signal import periodogram
 import igraph as gf
 from collections import Counter
 
-parallel=True
+parallel=False
 
 # ---------- GENERAL FUNCTIONS ----------
 def power_law(a, b, g, size):
@@ -288,8 +288,14 @@ def myConnectedComponents(W, s):
     visited = np.zeros(N, dtype=np.bool_)
     cc = np.zeros(N)
     
+    # Loop over nodes
     for v in range(N):
         if visited[v] == False:
+            # if not active, skip
+            if not s[v]>0:
+                continue
+            
+            # if active and not visited, compute cluster
             temp = List()
             temp.append(0)
             temp.remove(0)
@@ -326,16 +332,16 @@ def compute_clusters(W, s):
     return np.mean(S1), np.mean(S2), clusters.flatten()
 
 
-# ---------- AVALANCHES ----------
+#---------- AVALANCHES ----------
 @jit(nopython=True)
 def get_intersection(arr, y_star):
     '''
     Get all the intersection btw array and a hline
     '''
     # Increase intersection
-    start = np.where( (arr[:-1]<y_star) * (y_star<arr[1:]) )[0]
+    start = np.where( (arr[:-1]<=y_star) * (y_star<arr[1:]) )[0]
     # Decrease intersection
-    stop = np.where( (arr[:-1]>y_star) * (y_star>arr[1:]) )[0]
+    stop = np.where( (arr[:-1]>y_star) * (y_star>=arr[1:]) )[0]
     
     # Check if empty
     if len(start)<1 or len(stop)<1:
@@ -396,7 +402,7 @@ def get_avalanches(arr, y_star):
 
 
 @jit(nopython=True)
-def get_avalanches_pdf(data, threshold=1., Nbins=50):
+def get_avalanches_pdf(data):
     '''
     Return avalanches histogram from series of runs.
     '''
@@ -406,7 +412,7 @@ def get_avalanches_pdf(data, threshold=1., Nbins=50):
     runs = data.shape[0]
     
     for i in prange(runs):
-        tmp_size, tmp_time = get_avalanches(data[i], np.mean(data[i]) + threshold * np.std(data[i]))
+        tmp_size, tmp_time = get_avalanches(data[i], np.mean(data[i]))
         av_size = np.hstack((av_size, tmp_size))
         av_time = np.hstack((av_time, tmp_time))
         
@@ -414,22 +420,7 @@ def get_avalanches_pdf(data, threshold=1., Nbins=50):
     av_size = np.delete(av_size, 0)
     av_time = np.delete(av_time, 0)
     
-    # Get histograms to compress data (logarithmic bins)
-    a_min = np.min(av_size)
-    a_max = np.max(av_size)
-    #hist_size = np.histogram(av_size, bins = Nbins)
-    hist_size = np.histogram(av_size, bins = 10 ** np.linspace(np.log10(a_min), np.log10(a_max), Nbins))
-    
-    a_min = np.min(av_time)
-    a_max = np.max(av_time)
-    #hist_time = np.histogram(av_time, bins = Nbins)
-    hist_time = np.histogram(av_time, bins = 10 ** np.linspace(np.log10(a_min), np.log10(a_max), Nbins))
-            
-    # Convert bin edges to bin center
-    hist_size = np.vstack( ( (hist_size[1][1:] + hist_size[1][:-1])/2, hist_size[0] ) )
-    hist_time = np.vstack( ( (hist_time[1][1:] + hist_time[1][:-1])/2, hist_time[0] ) )
-    
-    return hist_size, hist_time
+    return av_size, av_time
 
 
 # ---------- CAUSAL AVALANCHES ----------
@@ -453,46 +444,47 @@ def get_causal_avalanches(aval):
             index = np.where(names == code)[0]         # get aval name index
             series[index, step] = count
     
-    return series / N
+    return series
 
 
-@jit(nopython=True)
-def get_causal_avalanches_pdf(aval, Nbins=50):
+@jit(nopython=True, parallel=parallel)
+def get_causal_avalanches_pdf(aval):
     '''
     Return size and time pdf of causal avalanches.
     '''
     steps, runs, N = aval.shape
     
-    sizes = np.array([0.0])
-    times = np.array([0])
+    ### Compute unique avalanches
+    n_aval = np.zeros(runs)
+    for i in prange(runs):
+        names = np.unique(aval[:,i])            # get the code of each avalanche
+        names = np.delete(names, 0)             # remove elements 0 i.e. not active
+        n_aval[i] = len(names)
     
-    # Loop over runs
+    ### Create array for storing sizes and times
+    sizes = np.zeros(( runs, int(np.max(n_aval)) ))
+    times = np.zeros(( runs, int(np.max(n_aval)) ))
+    
+    ### Loop over runs
     for i in prange(runs):
         series = get_causal_avalanches(aval[:,i])    # get time series of avalanches
         # Loop over avals
-        for j in range(len(series)):
-            size = np.array(series[j].sum()).reshape(1)
-            sizes = np.hstack(( sizes, size ))    # size as integral of single avalanche
+        for j in prange(len(series)):
+            size = series[j].sum()           # size as integral of single avalanche
+            sizes[i,j] = size
+            
             ts = np.where(series[j]>0)[0]    # get times where avalanche is active
-            ts = np.array(ts[-1]-ts[0]).reshape(1)
-            times = np.hstack((times, ts))
+            ts = ts[-1]-ts[0]
+            times[i,j] = ts
+            
+    ### Flatten array and remove zeros
+    sizes = sizes.flatten()
+    sizes = sizes[sizes > 0]
     
-    # Remove fake 0 as first element
-    sizes = np.delete(sizes, 0)
-    times = np.delete(times, 0)
+    times = times.flatten()
+    times = times[times > 0]
     
-    # Get histograms to compress data (logarithmic bins)
-    a_min = np.min(av_size)
-    a_max = np.max(av_size)
-    #hist_size = np.histogram(av_size, bins = Nbins)
-    hist_size = np.histogram(av_size, bins = 10 ** np.linspace(np.log10(a_min), np.log10(a_max), Nbins))
-    
-    a_min = np.min(av_time)
-    a_max = np.max(av_time)
-    #hist_time = np.histogram(av_time, bins = Nbins)
-    hist_time = np.histogram(av_time, bins = 10 ** np.linspace(np.log10(a_min), np.log10(a_max), Nbins))
-    
-    return hist_size, hist_time
+    return sizes, times
 
 
 # ---------- DYNAMICAL RANGE ----------
