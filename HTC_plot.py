@@ -181,7 +181,7 @@ class plotHTC:
             '''
         plt.show()
     
-    def plot_pdf(self, mod, xlabel, Nbins=None, yrange=None, scale='loglog'):
+    def plot_pdf(self, mod, xlabel, Nbins=None, yrange=None, scale='loglog', plow=None):
         cm1 = cm.get_cmap('jet')
         fact = 8
         
@@ -226,8 +226,7 @@ class plotHTC:
             ind = find_nearest(Trange, val)
             
             if Nbins==None:
-                dx = pdf[ind][0][1]-pdf[ind][0][0]
-                plt.scatter(pdf[ind][0], pdf[ind][1] / np.sum(pdf[ind][1]) / dx,
+                plt.scatter(pdf[ind][0], pdf[ind][1],
                             label='T='+str(round(val,1))+'*Tc', alpha=0.8, s=20,
                             c=[cm1(i/fact)]*len(pdf[ind][0]))
             else:
@@ -253,11 +252,10 @@ class plotHTC:
 
         for i in range(2,8):
             val = 0.2 * i
-            ind = find_nearest(Trange, val)
+            ind = find_nearest(Trange_norm, val)
         
             if Nbins==None:
-                dx = pdf_norm[ind][0][1] - pdf_norm[ind][0][0]
-                plt.scatter(pdf_norm[ind][0], pdf_norm[ind][1] / np.sum(pdf_norm[ind][1]) / dx,
+                plt.scatter(pdf_norm[ind][0], pdf_norm[ind][1],
                             label='T='+str(round(val,1))+'*Tc',alpha=0.8, s=20,
                             c=[cm1(i/fact)]*len(pdf_norm[ind][0]))
             else:
