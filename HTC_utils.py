@@ -86,7 +86,44 @@ def init_state(N, runs, fract):
         
     return states
     
+'''   
+@jit(nopython=True)
+def update_state_single(S, W, T, r1, r2, aval, step, avalOn):
     
+    Update state of the system according to HTC model
+    Update causal avalanches state
+    
+    N = len(S)
+    probs = np.random.random(N)                 # generate probabilities
+    s = (S==1).astype(np.float64)               # get active nodes
+    pA = ( r1 + (1.-r1) * ( (W@s)>T ) )         # prob. to become active
+
+    # update state vector
+    newS = ( (S==0)*(probs<pA)                  # I->A
+         + (S==1)*-1                            # A->R
+         + (S==-1)*(probs>r2)*-1 )              # R->I (remain R with prob 1-r2)
+    
+    # Causal avalanches
+    newAval = np.zeros(N)
+    if avalOn:        
+        p_single_neuron = W*s / (W@s).reshape(-1,1) # prob of single neuron to be activated
+        
+        # Loop over nodes
+        for node in prange(N):
+            # Check if new activation
+            if newS[node] == 1:
+                if (W@s)[node]>T:
+                    # Activated by another neuron
+                    p_cum = np.cumsum(p_single_neuron[node])    # cumsum
+                    causal = np.where(p_cum>=probs[node])[0]
+                    newAval[node] = aval[causal[0]]                    
+                else:
+                    # Self-activation
+                    newAval[node] = 10 +  step*N + node
+
+    return newS, newAval
+'''
+
 @jit(nopython=True)
 def update_state_single(S, W, T, r1, r2, aval, step, avalOn):
     '''
@@ -123,6 +160,7 @@ def update_state_single(S, W, T, r1, r2, aval, step, avalOn):
                     newAval[node] = 10 +  step*N + node
 
     return newS, newAval
+
 
 @jit(nopython=True, parallel=parallel)
 def update_state(S, W, T, r1, r2, aval, step, avalOn=True):
