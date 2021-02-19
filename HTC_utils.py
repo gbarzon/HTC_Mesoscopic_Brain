@@ -124,12 +124,12 @@ def update_state_single(S, W, T, r1, r2, aval, step, avalOn):
     return newS, newAval
 '''
 
+'''
+CAUSAL AVALANCHES
 @jit(nopython=True)
 def update_state_single(S, W, T, r1, r2, aval, step, avalOn):
-    '''
     Update state of the system according to HTC model
     Update causal avalanches state
-    '''
     N = len(S)
     probs = np.random.random(N)                 # generate probabilities
     s = (S==1).astype(np.float64)               # get active nodes
@@ -160,13 +160,10 @@ def update_state_single(S, W, T, r1, r2, aval, step, avalOn):
                     newAval[node] = 10 +  step*N + node
 
     return newS, newAval
-
-
+    
 @jit(nopython=True, parallel=parallel)
 def update_state(S, W, T, r1, r2, aval, step, avalOn=True):
-    '''
     Update state of each runs
-    '''
     runs = S.shape[0]
     newS = np.zeros((S.shape[0], S.shape[1]), dtype=np.float64)
     newAval = np.zeros((S.shape[0], S.shape[1]), dtype=np.int32)
@@ -178,6 +175,39 @@ def update_state(S, W, T, r1, r2, aval, step, avalOn=True):
         newAval[i] = tmpS[1]
         
     return (newS, (newS==1).astype(np.int64), newAval)
+'''
+
+@jit(nopython=True)
+def update_state_single(S, W, T, r1, r2):
+    '''
+    Update state of the system according to HTC model
+    Update causal avalanches state
+    '''
+    N = len(S)
+    probs = np.random.random(N)                 # generate probabilities
+    s = (S==1).astype(np.float64)               # get active nodes
+    pA = ( r1 + (1.-r1) * ( (W@s)>T ) )         # prob. to become active
+
+    # update state vector
+    newS = ( (S==0)*(probs<pA)                  # I->A
+         + (S==1)*-1                            # A->R
+         + (S==-1)*(probs>r2)*-1 )              # R->I (remain R with prob 1-r2)
+
+    return newS
+
+@jit(nopython=True, parallel=parallel)
+def update_state(S, W, T, r1, r2):
+    '''
+    Update state of each runs
+    '''
+    runs = S.shape[0]
+    newS = np.zeros((S.shape[0], S.shape[1]), dtype=np.float64)
+    
+    # Simulation step in parallel
+    for i in prange(runs):
+        newS[i] = update_state_single(S[i], W, T, r1, r2)
+        
+    return (newS, (newS==1).astype(np.int64))
 
 @jit(nopython=True)
 def stimulated_activity(W, runs, steps, r1, r2):
@@ -354,6 +384,7 @@ def compute_clusters(W, s):
     clusters = np.zeros((runs, N))
     S1 = np.zeros(runs)
     S2 = np.zeros(runs)
+    Smean = np.zeros(runs)
     
     # Loop over runs
     for i in prange(runs):
@@ -362,12 +393,13 @@ def compute_clusters(W, s):
         S1[i] = sizes[0]
         if ss>1:
             S2[i] = sizes[1]
+        Smean[i] = np.sum(sizes)/ss
         clusters[i,:ss] = sizes
     
     clusters = clusters.flatten() # flatten
     clusters = clusters[clusters>0] # remove fake zeros
     
-    return np.mean(S1), np.mean(S2), clusters.flatten()
+    return np.mean(S1), np.mean(S2), np.mean(Smean) clusters.flatten()
 
 
 #---------- AVALANCHES ----------

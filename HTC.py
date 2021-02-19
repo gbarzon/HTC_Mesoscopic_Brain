@@ -117,8 +117,8 @@ class HTC:
         obs = np.loadtxt(filename+delimiter+str('observables.txt'))
         
         # Load observables
-        tmp.A, tmp.sigmaA, tmp.Fisher, tmp.S1, tmp.S2, \
-        tmp.A_norm, tmp.sigmaA_norm, tmp.Fisher_norm, tmp.S1_norm, tmp.S2_norm = obs
+        tmp.A, tmp.sigmaA, tmp.Fisher, tmp.S1, tmp.S2, tmp.Smean \
+        tmp.A_norm, tmp.sigmaA_norm, tmp.Fisher_norm, tmp.S1_norm, tmp.S2_norm, tmp.Smean_norm = obs
         
         return tmp
     
@@ -232,7 +232,7 @@ class HTC:
     
     
     def simulate(self, results_folder,
-                 cluster=True, dinamical=True, complete_simulation=True,
+                 cluster=True, dinamical=False, complete_simulation=False,
                  steps=6000, runs=100):
         '''
         Run simulation for both original and normalized matrices
@@ -241,12 +241,12 @@ class HTC:
         
         self.A, self.sigmaA, self.Fisher, self.spectr, self.act, self.pdf_ev, self.Exc, \
         self.pdf_size, self.pdf_time, self.pdf_size_causal, self.pdf_time_causal, \
-        self.S1, self.S2, self.pdf = \
+        self.S1, self.S2, self.Smean, self.pdf = \
         self.run_model(self.W, cluster, dinamical, complete_simulation, steps, runs)
             
         self.A_norm, self.sigmaA_norm, self.Fisher_norm, self.spectr_norm, self.act_norm, self.pdf_ev_norm, self.Exc_norm, \
         self.pdf_size_norm, self.pdf_time_norm, self.pdf_size_causal_norm, self.pdf_time_causal_norm, \
-        self.S1_norm, self.S2_norm, self.pdf_norm = \
+        self.S1_norm, self.S2_norm, self.Smean_norm, self.pdf_norm = \
         self.run_model(normalize(self.W), cluster, dinamical, complete_simulation, steps, runs)
         
         print('End simulation for '+str(self.name))
@@ -254,7 +254,7 @@ class HTC:
         self.save(results_folder, cluster, dinamical, complete_simulation)
     
     
-    def run_model(self, W, cluster, dinamical, complete_simulation, steps, runs, fract=0.1):
+    def run_model(self, W, cluster, dinamical, complete_simulation, steps, runs, fract=0.1, steps_cluster=5):
         '''
         HTC model
         '''
@@ -282,7 +282,7 @@ class HTC:
         
         Exc = np.zeros((len(Trange),len(self.stimuli)))
         
-        S1, S2 = [np.zeros(len(Trange)) for _ in range(2)]
+        S1, S2, Smean = [np.zeros(len(Trange)) for _ in range(3)]
         pdf = [Counter() for _ in range(len(Trange))]
 
         if self.verbose:
@@ -303,31 +303,35 @@ class HTC:
             # MODEL INITIALIZATION
             # create empty array to store activity and cluster size over time
             Aij = np.zeros((runs, steps, self.N))
-            aval_ij = np.zeros((steps, runs, self.N))
+            #aval_ij = np.zeros((steps, runs, self.N))
             
             # init activity and avalanches
             S = init_state(self.N, runs, fract)
-            aval = (S==1) * np.arange(1,self.N+1)
-            aval = aval.astype(np.int32)
+            #aval = (S==1) * np.arange(1,self.N+1)
+            #aval = aval.astype(np.int32)
 
             if cluster:
-                S1t = np.zeros(steps)
-                S2t = np.zeros(steps)
+                S1t = np.zeros(steps//steps_cluster)
+                S2t = np.zeros(steps//steps_cluster)
+                Smeant = np.zeros(steps//steps_cluster)
 
             # LOOP OVER TIME STEPS
             for t in ( tqdm(range(steps)) if self.verbose else range(steps)):
                 # UPDATE STATE VECTOR
-                S, s, aval = update_state(S, W, T, self.r1, self.r2, aval, t, avalOn=True)
+                #S, s, aval = update_state(S, W, T, self.r1, self.r2, aval, t, avalOn=True)
+                #Aij[:,t] = s
+                #aval_ij[t] = aval
+                S, s = update_state(S, W, T, self.r1, self.r2)
                 Aij[:,t] = s
-                aval_ij[t] = aval
 
                 # COMPUTE CLUSTERS
                 if cluster:
-                    S1t[t], S2t[t], tmp_counts = compute_clusters(W, s)
-                    pdf[i] += Counter(tmp_counts)
+                    if t%steps_cluster == 0:
+                        S1t[t//steps_cluster], S2t[t//steps_cluster], Smeant[t//steps_cluster], tmp_counts = compute_clusters(W, s)
+                        pdf[i] += Counter(tmp_counts)
                  
             # clear tmp variables
-            del S, s, aval
+            del S, s#, aval
             # END LOOP OVER TIME
             
             # COMPUTE AVERAGES
@@ -341,17 +345,20 @@ class HTC:
             if cluster:
                 S1[i] = np.mean(S1t)
                 S2[i] = np.mean(S2t)
+                Smean[i] = np.mean(Smeant)
                 
                 del S1t, S2t
             # END COMPUTE AVERAGES
             
+            # FISHER INFORMATION
+            if self.verbose: print('Computing Fisher information...')
+            Fisher[i] = fisher_information(Aij)
+            # END FISHER INFORMATION
+            
+            del Aij
+            
             if complete_simulation:
-                # FISHER INFORMATION
-                if self.verbose: print('Computing Fisher information...')
-                Fisher[i] = fisher_information(Aij)
-                
                 # INTER-EVENT TIME
-                
                 if self.verbose: print('Computing interevent time...')
                 pdf_ev[i] = Counter(interevent(Aij))
             
@@ -438,7 +445,7 @@ class HTC:
             
         return (A, sigma_A, Fisher, spectr, act, pdf_ev, Exc,
                 pdf_size, pdf_time, pdf_size_causal, pdf_time_causal,
-                S1/self.N, S2/self.N, pdf)
+                S1/self.N, S2/self.N, Smean, pdf)
         
         
     def save(self, results_folder, cluster, dinamical, complete_simulation):
@@ -473,9 +480,9 @@ class HTC:
         
         np.savetxt(filename + delimiter + 'observables.txt',
                    (self.A, self.sigmaA, self.Fisher,
-                    self.S1, self.S2,
+                    self.S1, self.S2, self.Smean,
                     self.A_norm, self.sigmaA_norm, self.Fisher_norm,
-                    self.S1_norm, self.S2_norm), fmt='%e')
+                    self.S1_norm, self.S2_norm, self.Smean_norm), fmt='%e')
         
         if cluster:
             write_lists(self.pdf, self.pdf_norm, filename + delimiter + 'pdf.txt')

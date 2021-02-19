@@ -9,15 +9,20 @@ import itertools
 if __name__ == '__main__':
     
     #nets = ['random', 'small', 'barabasi']
-    nets = ['barabasi']
+    nets = ['random']
     
     # Simulation parameters
-    N = 200
-    dT = 0.03
-    runs = 50
+    #N = 200
+    #dT = 0.03
+    #runs = 50
     #ps = [0.1, 0.2, 0.3, 0.4, 0.5]
     #ps = [1.]
-    ks = np.array([5,15,25])
+    #ks = np.array([5,15,25])
+    
+    N = 50
+    dT = 1
+    runs = 2
+    ks = np.array([5])
     
     # Start Dask client
     client = Client()
@@ -62,15 +67,14 @@ if __name__ == '__main__':
             mods = client.map(lambda x: HTC(net, N=N, dT=dT, p=0.5, k=int((N-np.sqrt(N**2-2*x[0]*N))/2), Id=x[1], W_mean=W_means[np.array(ks)==x[0]][0]), sims)
         
         # Complete computation graph
-        processed = client.map(lambda obj: obj.simulate(folder, cluster=True, dinamical=True, runs=1), mods)
+        processed = client.map(lambda obj: obj.simulate(folder, runs=1), mods)
         # Run the actual computation
         client.gather(processed)
         
-        '''
+        
         # Get mean object and clean folder
-        for name in names:
-            get_mean_HTC(folder, name, runs)
-        '''
+        #for name in names:
+        #    get_mean_HTC(folder, name, runs)
     
     stop = time.time()
     print('Total execution time: '+str((stop-start)/60)+'mins')
