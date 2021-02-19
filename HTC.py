@@ -117,7 +117,7 @@ class HTC:
         obs = np.loadtxt(filename+delimiter+str('observables.txt'))
         
         # Load observables
-        tmp.A, tmp.sigmaA, tmp.Fisher, tmp.S1, tmp.S2, tmp.Smean \
+        tmp.A, tmp.sigmaA, tmp.Fisher, tmp.S1, tmp.S2, tmp.Smean, \
         tmp.A_norm, tmp.sigmaA_norm, tmp.Fisher_norm, tmp.S1_norm, tmp.S2_norm, tmp.Smean_norm = obs
         
         return tmp
@@ -347,7 +347,7 @@ class HTC:
                 S2[i] = np.mean(S2t)
                 Smean[i] = np.mean(Smeant)
                 
-                del S1t, S2t
+                del S1t, S2t, Smeant
             # END COMPUTE AVERAGES
             
             # FISHER INFORMATION

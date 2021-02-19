@@ -8,21 +8,15 @@ import itertools
 
 if __name__ == '__main__':
     
-    #nets = ['random', 'small', 'barabasi']
-    nets = ['random']
+    nets = ['random', 'small', 'barabasi']
+    #nets = ['random']
     
     # Simulation parameters
-    #N = 200
-    #dT = 0.03
-    #runs = 50
+    N = 500
+    dT = 0.03
+    runs = 50
     #ps = [0.1, 0.2, 0.3, 0.4, 0.5]
-    #ps = [1.]
-    #ks = np.array([5,15,25])
-    
-    N = 50
-    dT = 1
-    runs = 2
-    ks = np.array([5])
+    ks = np.array([5,15,25,40,60])
     
     # Start Dask client
     client = Client()

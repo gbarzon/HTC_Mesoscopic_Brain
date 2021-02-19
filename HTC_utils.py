@@ -389,17 +389,16 @@ def compute_clusters(W, s):
     # Loop over runs
     for i in prange(runs):
         sizes = myConnectedComponents(W, s[i])
-        ss = len(sizes)
         S1[i] = sizes[0]
-        if ss>1:
-            S2[i] = sizes[1]
-        Smean[i] = np.sum(sizes)/ss
-        clusters[i,:ss] = sizes
+        S2[i] = sizes[1]
+        if not np.count_nonzero(sizes)==0:
+            Smean[i] = np.sum(sizes) / np.count_nonzero(sizes)
+        clusters[i] = sizes
     
     clusters = clusters.flatten() # flatten
     clusters = clusters[clusters>0] # remove fake zeros
     
-    return np.mean(S1), np.mean(S2), np.mean(Smean) clusters.flatten()
+    return np.mean(S1), np.mean(S2), np.mean(Smean), clusters.flatten()
 
 
 #---------- AVALANCHES ----------
