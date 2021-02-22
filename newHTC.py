@@ -14,9 +14,9 @@ delimiter = '_'
 class HTC:
     
     def __init__(self, network, generator=True, W = None,
-                 weights='expo', N=66,
+                 weights='power_law', N=66,
                  Tmin = 0.0, Tmax = 1.5, dT = 0.03, W_mean=None,
-                 Nstim = 20, Id = 0,
+                 Nstim = 20, Id = 0, runs = 50,
                  **kwargs):
         '''
         Class initializer
@@ -28,6 +28,7 @@ class HTC:
         self.network = network
         self.N = N
         self.weights = weights
+        self.runs = runs
         
         self.Tmin = Tmin
         self.Tmax = Tmax
@@ -183,48 +184,54 @@ class HTC:
             self.W = np.loadtxt('dati/RSN/RSN_matrix.txt')
             #self.W = np.loadtxt('dati/Hagmann/group_mean_connectivity_matrix.txt')
         else:
-            if self.network == 'random':
-                top = ig.Graph.Erdos_Renyi(n=self.N, p=self.p)
-            elif self.network == 'small':
-                top = ig.Graph.Watts_Strogatz(dim=1, size=N, nei=self.k//2, p=self.p)
-            elif self.network == 'barabasi':
-                top = ig.Graph.Barabasi(N,self.k)
-            else:
-                raise Exception('Network not defined')
+            #self.W = np.zeros((self.runs, self.N, self.N))
+            self.W = []
+            i = 0
             
-            # Check if connected, otherwise try to generate again
-            if not top.is_connected():
-                print('WARNING: the network is not connected. Generate again.')
-                self.generate_network()
+            while i<self.runs:
+                if self.network == 'random':
+                    top = ig.Graph.Erdos_Renyi(n=self.N, p=self.p)
+                elif self.network == 'small':
+                    top = ig.Graph.Watts_Strogatz(dim=1, size=N, nei=self.k//2, p=self.p)
+                elif self.network == 'barabasi':
+                    top = ig.Graph.Barabasi(N,self.k)
+                else:
+                    raise Exception('Network not defined')
+                
+                if not top.is_connected():
+                    print('WARNING: the network is not connected. Generate again.')
+                    continue
+                    
+                top = top.get_adjacency_sparse().toarray()
             
-            top = top.get_adjacency_sparse().toarray()
+                # Generate weights from distribution
+                if self.weights == 'unif':
+                    W = np.random.uniform(0., .5, size=(self.N, self.N))
+                elif self.weights == 'power_law':
+                    W = power_law(5*10**-3, .5, g=-1.5, size=(self.N, self.N))
+                elif self.weights == 'expo':
+                    W = np.random.exponential(scale=1./12.5, size=(self.N, self.N))
+                elif self.weights == 'constant':
+                    W = np.ones( (self.N, self.N) )
+                else:
+                    raise Exception('Incorrect weight distribution')
             
-            # Generate weights from distribution
-            if self.weights == 'unif':
-                self.W = np.random.uniform(0., .5, size=(self.N, self.N))
-            elif self.weights == 'power_law':
-                self.W = power_law(5*10**-3, .5, g=-1.5, size=(self.N, self.N))
-            elif self.weights == 'expo':
-                self.W = np.random.exponential(scale=1./12.5, size=(self.N, self.N))
-            elif self.weights == 'constant':
-                self.W = np.ones( (self.N, self.N) )
-            else:
-                raise Exception('Incorrect weight distribution')
-            
-            # Symmetrize and mask with topology
-            self.W = np.triu(self.W, 1)
-            self.W = self.W + self.W.T
-            self.W = self.W * top
+                # Symmetrize and mask with topology
+                W = np.triu(W, 1)
+                W = W + W.T
+                W = W * top
+                
+                # Store matrix
+                self.W.append(W)
+                i+=1
 
     def compute_parameters(self):
         '''
         Compute transition rates and (theorical) critical temperature
         '''
         
-        #self.r1 = 2./self.N
-        self.r1 = 1e-3
-        #self.r2 = self.r1**(1./5.)
-        self.r2 = 3e-1
+        self.r1 = 2./self.N
+        self.r2 = self.r1**(1./5.)
         self.Tc = self.r2 / (1. + 2.*self.r2)
         self.Trange = np.arange(self.Tmin, self.Tmax+self.dT, self.dT) * self.Tc
         self.stimuli = np.logspace(-5, 0, self.Nstim, endpoint=True)
@@ -318,10 +325,10 @@ class HTC:
                 Smeant = np.zeros(steps//steps_cluster)
 
             # LOOP OVER TIME STEPS
-            # Initial equilibration
+            #Initial part
             for t in range(100):
                 S, s = update_state(S, W, T, self.r1, self.r2)
-            
+                
             for t in ( tqdm(range(steps)) if self.verbose else range(steps)):
                 # UPDATE STATE VECTOR
                 #S, s, aval = update_state(S, W, T, self.r1, self.r2, aval, t, avalOn=True)
@@ -389,7 +396,7 @@ class HTC:
                                          bins = np.logspace( np.log10(np.min(times)), np.log10(np.max(times)), Nbins),
                                          density=True)
                 
-                # Reshape histograms
+                # Reshape histograms
                 center = 10 ** ( ( np.log10(hist_size[1][1:]) + np.log10(hist_size[1][:-1]) ) / 2 )
                 hist_size = np.array(( center, hist_size[0] ))
                 center = 10 ** ( ( np.log10(hist_time[1][1:]) + np.log10(hist_time[1][:-1]) ) / 2 )
@@ -414,7 +421,7 @@ class HTC:
                                          bins = np.logspace( np.log10(np.min(times)), np.log10(np.max(times)), Nbins),
                                          density=True)
                 
-                # Reshape histograms
+                # Reshape histograms
                 center = 10 ** ( ( np.log10(hist_size[1][1:]) + np.log10(hist_size[1][:-1]) ) / 2 )
                 hist_size = np.array(( center, hist_size[0] ))
                 center = 10 ** ( ( np.log10(hist_time[1][1:]) + np.log10(hist_time[1][:-1]) ) / 2 )
